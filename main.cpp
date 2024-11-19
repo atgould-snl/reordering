@@ -1,4 +1,4 @@
-"Kokkos_Core.hpp"
+#include "Kokkos_Core.hpp"
 #include <iostream>
 
 int main(int argc, char* argv[]) {
