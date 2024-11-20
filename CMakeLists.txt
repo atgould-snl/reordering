@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(MyApplication)
 
 # Specify the path to the Trilinos installation
-set(Trilinos_DIR /scratch/malphil/trilinos-devel/trilinos-builds/installs/ifpack2/lib64/cmake/Trilinos)
+set(Trilinos_DIR /fgs/atgould/teko_trilinos/trilinos-builds/installs/ifpack2/lib64/cmake/Trilinos/)
 
 # Find Trilinos
 find_package(Trilinos REQUIRED)
@@ -15,3 +15,5 @@ add_executable(my_application main.cpp)
 
 # Link against Trilinos and Kokkos
 target_link_libraries(my_application ${Trilinos_LIBRARIES})
+
+# Comment change
