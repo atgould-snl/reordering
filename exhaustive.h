@@ -1,6 +1,5 @@
 #pragma once
 #include "common.h"
-#include "exhaustive.cpp"
 
 // Function prototypes
 void update_score(Kokkos::View<double**>& T, order& order_now);

@@ -43,7 +43,7 @@ Kokkos::View<double**> create_random_T(int n) {
     // Fill the Kokkos view with random numbers
     Kokkos::parallel_for("FillRandomMatrix", Kokkos::RangePolicy<>(0, n), KOKKOS_LAMBDA(int i) {
         // Create a random number generator and distribution for each thread
-        std::default_random_engine generator(i); // Seed with the row index for reproducibility
+        std::default_random_engine generator(i+10); // Seed with the row index for reproducibility
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
         for (int j = 0; j < n; ++j) {
             // Generate a random number and assign it to the matrix

@@ -11,7 +11,7 @@ find_package(Trilinos REQUIRED)
 include_directories(${Trilinos_INCLUDE_DIRS})
 link_directories(${Trilinos_LIBRARY_DIRS})
 
-add_executable(my_application main.cpp)
+add_executable(my_application main.cpp exhaustive.cpp branchAndBound.cpp)
 
 # Link against Trilinos and Kokkos
 target_link_libraries(my_application ${Trilinos_LIBRARIES})
