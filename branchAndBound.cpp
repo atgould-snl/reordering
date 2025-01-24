@@ -50,7 +50,10 @@ void branchAndBoundPermutationSearch::solve(){
             double additionalLoss = std::min(blockNorms(memberPresort[memberIdx],memberPresort[otherMemberIdx]),blockNorms(memberPresort[otherMemberIdx],memberPresort[memberIdx]));
             if (allowMerge){
                 // Test option to merge
-                assert(false);
+                // TESTING ONLY TODO
+                //assert(false);
+                double mergeLoss=0;
+                additionalLoss = std::min(additionalLoss,mergeLoss);
             }
             totalLossLowerBound+=additionalLoss;
         }
@@ -161,7 +164,9 @@ void branchAndBoundPermutationSearch::insertMember(partialOrder& order, const in
     if (merge){
         order.blocks[newMember]=intoBlock;
         // TODO update score due to merge
-        assert(false);
+        //assert(false);
+        double mergeLoss=0; // TESTING ONLY
+        order.loss += mergeLoss;
     }
     for (int member=0; member<n; member++){ // Loop through members
         if (order.blocks[member]){ // Has this member been assigned yet?
