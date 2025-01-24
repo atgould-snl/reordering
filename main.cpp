@@ -4,7 +4,7 @@
 
 
 int main(int argc, char* argv[]) {
-    int n=10;
+    int n=9;
     Kokkos::initialize(argc, argv);
     Kokkos::View<double**> T=create_random_T(n);
     print_matrix(T);
@@ -16,8 +16,8 @@ int main(int argc, char* argv[]) {
 }
 
 
-int main_old2(int argc, char* argv[]) {
-    int n=8;
+int main_(int argc, char* argv[]) {
+    int n=9;
     Kokkos::initialize(argc, argv);
     Kokkos::View<double**> T=create_random_T(n);
     print_matrix(T);
@@ -29,7 +29,7 @@ int main_old2(int argc, char* argv[]) {
 }
 
 
-int main_old(int argc, char* argv[]) {
+int main_old2(int argc, char* argv[]) {
     Kokkos::initialize(argc, argv);
 
     {

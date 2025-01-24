@@ -4,6 +4,11 @@
 #include <list>
 #include <limits>
 #include <random>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <utility>
+
 
 #include <chrono> // easy timer
 
