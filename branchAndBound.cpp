@@ -1,5 +1,7 @@
 #include "common.h"
 #include "branchAndBound.h"
+#include <algorithm>
+#include <cassert>
 
 
 // FUNCTION DEFINITION
@@ -64,19 +66,23 @@ void branchAndBoundPermutationSearch::solve(){
     // Make recursive call to add to order
     partialOrder base = partialOrder(n);
     addToOrder(base, true);
+    if (earlyTerminationWarning){
+        std::cout << "WARNING: search terminated early after checking " << terminateSearchAfterNumLeafNodes << " orders." << std::endl;
+    }
 }
 
 void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool prevBest){
     numInternalNodes++;
     // Allocate for branches
     int nBranches=order.nBlocks+1; // Insert between existing blocks and before and after
-    nBranches+=(allowBranchCutting && !prevBest) ? -2 : 0; // No need for branches for new member inserted before or after all previous if it wasn't the best performer previously
+    bool preventFrontBackBranches = allowBranchCutting && !prevBest;
+    nBranches+=preventFrontBackBranches ? -2 : 0; // No need for branches for new member inserted before or after all previous if it wasn't the best performer previously
     nBranches+=allowMerge ? order.nBlocks : 0; // Additional branches to allow for merging
     std::vector<partialOrder> branchOrders = std::vector<partialOrder>(nBranches,partialOrder(order)); // Fill with copies
 
     // Insert into branches
     int branchIdx=0;
-    for (int addAsBlock=0; addAsBlock < order.nBlocks+1; addAsBlock++){
+    for (int addAsBlock=(preventFrontBackBranches ? 1 : 0); addAsBlock < order.nBlocks+(preventFrontBackBranches ? 0 : 1); addAsBlock++){ //TODO bounds with prev best
         insertMember(branchOrders[branchIdx],memberPresort[order.nMembers],addAsBlock,false);
         branchIdx++;
     }
@@ -86,6 +92,7 @@ void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool
             branchIdx++;
         }
     }
+    assert(branchIdx==nBranches); // Make sure we got them all
     // Sort branches
     std::sort(branchOrders.begin(), branchOrders.end(),[](const partialOrder& branchA, const partialOrder& branchB){return branchA.loss < branchB.loss;});
 
@@ -95,16 +102,19 @@ void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool
         numLeafNodes+=nBranches; // All of these branches are terminal
         return;
     }
+
     // Loop through the sorted branches and make recursive call
-    else{
-        bool best=true;
-        for (auto branchOrder : branchOrders){
-            // Make the recursive call
-            if (!allowBranchCutting || branchOrder.loss + remainingLossLowerBound[branchOrder.nMembers] < minLossOrder.loss){ // Test if branch should be cut
-                addToOrder(branchOrder,best);
+    bool best=true;
+    for (auto branchOrder : branchOrders){
+        // Make the recursive call
+        if (!allowBranchCutting || branchOrder.loss + remainingLossLowerBound[branchOrder.nMembers] < minLossOrder.loss){ // Test if branch should be cut
+            if (numLeafNodes>terminateSearchAfterNumLeafNodes){ // TODO add time limit
+                earlyTerminationWarning=true;
+                return;
             }
-            best=false;
+            addToOrder(branchOrder,best);
         }
+        best=false;
     }
 }
 
@@ -149,13 +159,11 @@ void branchAndBoundPermutationSearch::insertMember(partialOrder& order, const in
     if (!merge){ // Bump higher blocks forward
         order.nBlocks++;
         for (int member=0; member<n; member++){
-            if (order.blocks[member]){
-                if (order.blocks[member] >= intoBlock){
-                    order.blocks[member].value()++; // Bumped up by new insertion
-                }
+            if (!order.blocks[member]) continue;
+            if (order.blocks[member] >= intoBlock){
+                order.blocks[member].value()++; // Bumped up by new insertion
             }
         }
-        
     }
     order.blocks[newMember]=intoBlock;
     order.nMembers++;
@@ -169,16 +177,15 @@ void branchAndBoundPermutationSearch::insertMember(partialOrder& order, const in
         order.loss += mergeLoss;
     }
     for (int member=0; member<n; member++){ // Loop through members
-        if (order.blocks[member]){ // Has this member been assigned yet?
-            double v=0; // Default, used within the same block
-            if (order.blocks[newMember] > order.blocks[member]){
-                v = blockNorms(newMember, member); // To the left
-            }
-            else if (order.blocks[newMember] < order.blocks[member]){
-                v = blockNorms(member, newMember); // Below
-            }
-            order.loss += v * v;
+        if (!order.blocks[member]) continue; // Has this member been assigned yet?
+        double v=0; // Default, used within the same block
+        if (order.blocks[newMember] > order.blocks[member]){
+            v = blockNorms(newMember, member); // To the left
         }
+        else if (order.blocks[newMember] < order.blocks[member]){
+            v = blockNorms(member, newMember); // Below
+        }
+        order.loss += v * v;
     }
 }
 

@@ -166,4 +166,14 @@ TEST(branchAndBoundTests, all){
     // Check total scanned
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
+    for (int i=0; i<10; i++){
+        T = getRandomT(20);
+        easy_timer et1 = easy_timer();
+        branchAndBoundPermutationSearch speedObj = branchAndBoundPermutationSearch(T);
+        speedObj.allowBranchCutting=true;
+        speedObj.allowMerge=false;
+        speedObj.solve();
+        //speedObj.minLossOrder.print();
+        et1.print_time();
+    }
 }

@@ -7,6 +7,8 @@
 
 
 using BlockNormsViewType = Kokkos::View<double**>; //GaussSeidelBlockReorderPreconditionerFactory::BlockNormsViewType;
+// using PermutationScoreType = std::pair<PermutationType, double>;
+// using PermutationType = std::map<int, int>;
 
 // Function prototypes
 //std::map<int,int>  doNothing(int a);
@@ -18,14 +20,14 @@ struct partialOrder
     // FIELDS
     std::vector<std::optional<int>> blocks; // List of lists of doubles
     double loss;                        // Loss value
-    double nBlocks;
-    double nMembers;
+    int nBlocks;
+    int nMembers;
     
     // CONSTRUCTION
     partialOrder(int initialn=0, double initialLoss=0.0, int initialnBlock=0, int initialnMember=0) : blocks(std::vector<std::optional<int>>(initialn)), loss(initialLoss) , nBlocks(initialnBlock), nMembers(initialnMember){} 
     // As copy
-    partialOrder(const partialOrder& other) 
-        : blocks(other.blocks), loss(other.loss), nBlocks(other.nBlocks), nMembers(other.nMembers) {}
+    //partialOrder(const partialOrder& other) 
+    //    : blocks(other.blocks), loss(other.loss), nBlocks(other.nBlocks), nMembers(other.nMembers) {}
 
     // PRINTING
     void print() const {
@@ -60,17 +62,8 @@ struct partialOrder
 
 class branchAndBoundPermutationSearch
 {
-private:
-    //void add_to_order( , bool prevMin=true);
-    //void 
-    void addToOrder(const partialOrder& order, bool prevBest=true);
-    void insertMember(partialOrder& order, const int newMember, const int intoBlock, const bool merge);
-    void updateLoss(partialOrder& order);
-    bool compareCandidateOrder(partialOrder& newOrder); // Compares orders and replaces if the new one is lower cost
-    //double lowerTriangularLoss(BlockNormsViewType& blockNorms, partialOrder);
 public:
     branchAndBoundPermutationSearch(BlockNormsViewType& blockNorms);
-    ~branchAndBoundPermutationSearch()=default; // Destructor
     BlockNormsViewType& blockNorms;
     int n=0;
     bool allowMerge=false;
@@ -83,10 +76,20 @@ public:
     //double minLoss = std::numeric_limits<double>::max();
     int numInternalNodes = 0;
     int numLeafNodes = 0;
+    int terminateSearchAfterNumLeafNodes = 1E6;
+    bool earlyTerminationWarning=false;
 
     void solve(); // After problem is set up, calls the private recursive function
     void solveExhuastive();
     
+    private:
+        //void add_to_order( , bool prevMin=true);
+        //void 
+        void addToOrder(const partialOrder& order, bool prevBest=true);
+        void insertMember(partialOrder& order, const int newMember, const int intoBlock, const bool merge);
+        void updateLoss(partialOrder& order);
+        bool compareCandidateOrder(partialOrder& newOrder); // Compares orders and replaces if the new one is lower cost
+        //double lowerTriangularLoss(BlockNormsViewType& blockNorms, partialOrder);
 };
 
 

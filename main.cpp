@@ -9,7 +9,6 @@ int main(int argc, char* argv[]) {
     Kokkos::View<double**> T=create_random_T(n);
     print_matrix(T);
     easy_timer main_time=easy_timer();
-    //doNothing(1);
     std::map<int,int> orderMap = branchAndBoundLossMinimizationBlockPermutation(T, true);
     main_time.print_time();
     return 0;
