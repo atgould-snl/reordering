@@ -7,7 +7,8 @@
 // FUNCTION DEFINITION
 std::map<int,int> branchAndBoundLossMinimizationBlockPermutation(BlockNormsViewType& blockNorms, bool verbose){
     // Create the object
-    branchAndBoundPermutationSearch bb = branchAndBoundPermutationSearch(blockNorms);
+    BranchAndBoundPermutationSearch bb = BranchAndBoundPermutationSearch(blockNorms);
+    bb.allowBranchCutting=true;
 
     // Run reordering
     bb.solve();
@@ -21,15 +22,14 @@ std::map<int,int> branchAndBoundLossMinimizationBlockPermutation(BlockNormsViewT
 }
 
 // CLASS DEFINITION
-branchAndBoundPermutationSearch::branchAndBoundPermutationSearch(BlockNormsViewType& blockNorms)
+BranchAndBoundPermutationSearch::BranchAndBoundPermutationSearch(BlockNormsViewType& blockNorms)
     : blockNorms(blockNorms)
 {
     n = blockNorms.extent(0);
 }
 
-void branchAndBoundPermutationSearch::solve(){
+void BranchAndBoundPermutationSearch::solve(){
     // Precompute the lower bounds
-
     // Find the presort order to add members
     auto memberImportance=std::vector<double>(n,0);
     for (int member=0; member<n; member++){
@@ -64,25 +64,25 @@ void branchAndBoundPermutationSearch::solve(){
     }
 
     // Make recursive call to add to order
-    partialOrder base = partialOrder(n);
+    PartialOrder base = PartialOrder(n);
     addToOrder(base, true);
     if (earlyTerminationWarning){
         std::cout << "WARNING: search terminated early after checking " << terminateSearchAfterNumLeafNodes << " orders." << std::endl;
     }
 }
 
-void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool prevBest){
+void BranchAndBoundPermutationSearch::addToOrder(const PartialOrder& order, bool prevBest){
     numInternalNodes++;
     // Allocate for branches
     int nBranches=order.nBlocks+1; // Insert between existing blocks and before and after
     bool preventFrontBackBranches = allowBranchCutting && !prevBest;
     nBranches+=preventFrontBackBranches ? -2 : 0; // No need for branches for new member inserted before or after all previous if it wasn't the best performer previously
     nBranches+=allowMerge ? order.nBlocks : 0; // Additional branches to allow for merging
-    std::vector<partialOrder> branchOrders = std::vector<partialOrder>(nBranches,partialOrder(order)); // Fill with copies
+    std::vector<PartialOrder> branchOrders = std::vector<PartialOrder>(nBranches,PartialOrder(order)); // Fill with copies. Preallocated for speed
 
     // Insert into branches
     int branchIdx=0;
-    for (int addAsBlock=(preventFrontBackBranches ? 1 : 0); addAsBlock < order.nBlocks+(preventFrontBackBranches ? 0 : 1); addAsBlock++){ //TODO bounds with prev best
+    for (int addAsBlock=(preventFrontBackBranches ? 1 : 0); addAsBlock < order.nBlocks+(preventFrontBackBranches ? 0 : 1); addAsBlock++){
         insertMember(branchOrders[branchIdx],memberPresort[order.nMembers],addAsBlock,false);
         branchIdx++;
     }
@@ -94,7 +94,7 @@ void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool
     }
     assert(branchIdx==nBranches); // Make sure we got them all
     // Sort branches
-    std::sort(branchOrders.begin(), branchOrders.end(),[](const partialOrder& branchA, const partialOrder& branchB){return branchA.loss < branchB.loss;});
+    std::sort(branchOrders.begin(), branchOrders.end(),[](const PartialOrder& branchA, const PartialOrder& branchB){return branchA.loss < branchB.loss;});
 
     // Are we at the bottom of the recursion?
     if (branchOrders[0].nMembers == n){
@@ -118,11 +118,11 @@ void branchAndBoundPermutationSearch::addToOrder(const partialOrder& order, bool
     }
 }
 
-void branchAndBoundPermutationSearch::solveExhuastive(){
+void BranchAndBoundPermutationSearch::solveExhuastive(){
     // Loop through all permutations
 
     // Start with a vector of counting numbers
-    partialOrder order(n,0,n);
+    PartialOrder order(n,0,n);
     std::iota(order.blocks.begin(), order.blocks.end(), 0);
 
     do {
@@ -136,7 +136,7 @@ void branchAndBoundPermutationSearch::solveExhuastive(){
     return;
 }
 
-void branchAndBoundPermutationSearch::updateLoss(partialOrder& order){
+void BranchAndBoundPermutationSearch::updateLoss(PartialOrder& order){
     order.loss=0; // Starting from scratch
     // Loop through potential vector
     for (int i=0; i<n; i++){ // Loop through rows
@@ -152,7 +152,7 @@ void branchAndBoundPermutationSearch::updateLoss(partialOrder& order){
     }
 }
 
-void branchAndBoundPermutationSearch::insertMember(partialOrder& order, const int newMember, const int intoBlock, const bool merge){
+void BranchAndBoundPermutationSearch::insertMember(PartialOrder& order, const int newMember, const int intoBlock, const bool merge){
     // MAKE INSERTION
     // Update with new member
     assert(!order.blocks[newMember]); // Make sure this member has not already been assigned
@@ -189,7 +189,7 @@ void branchAndBoundPermutationSearch::insertMember(partialOrder& order, const in
     }
 }
 
-bool branchAndBoundPermutationSearch::compareCandidateOrder(partialOrder& newOrder){
+bool BranchAndBoundPermutationSearch::compareCandidateOrder(PartialOrder& newOrder){
     // Check that the order is complete
     assert(newOrder.nBlocks=n);
     for (auto block : newOrder.blocks){assert(block);}

@@ -22,22 +22,22 @@ Kokkos::View<double**> vectorToKokkosView(const std::vector<std::vector<double>>
     return kokkosView;
 }
 
-Kokkos::View<double**> getRandomT(int n, double maxExp = 3.) {
+Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3.) { // Exponential mode simulates variability over orders of magnitude
     // Create a Kokkos View with the same dimensions
     Kokkos::View<double**> kokkosView("kokkosView", n, n);
 
     // Seed the random number generator
     std::random_device rd;  // Obtain a random number from hardware
     std::mt19937 gen(rd());  // Seed the generator
-    std::uniform_real_distribution<> dis(0.0, maxExp);  // Define the range
+    std::uniform_real_distribution<> dis(0.0, randMax);  // Define the range
 
     // Fill the Kokkos View with random values
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
             // Generate a random exponent between 1 and maxExp
-            double exp=dis(gen);
+            double rand=dis(gen);
             // Generate a random number in the range [10^1, 10^maxExp]
-            kokkosView(i, j) = std::pow(10, exp);
+            kokkosView(i, j) = expMode ? std::pow(10, rand) : rand;
         }
     }
 
@@ -102,14 +102,14 @@ TEST(branchAndBoundTests, all){
     //std::map<int,int> foundMap = branchAndBoundLossMinimizationBlockPermutation(T, true);
 
     // EXHAUSTIVE SOLN
-    branchAndBoundPermutationSearch exhaustiveObj = branchAndBoundPermutationSearch(T);
+    BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
     exhaustiveObj.solveExhuastive();
     exhaustiveObj.minLossOrder.print();
     std::map<int,int> exhuastiveMap=exhaustiveObj.minLossOrder.getMap();
     EXPECT_EQ(exhuastiveMap,solnMap);
 
     // BB WITH NO BRANCH CUTTING NO MERGING
-    branchAndBoundPermutationSearch bbObj = branchAndBoundPermutationSearch(T);
+    BranchAndBoundPermutationSearch bbObj = BranchAndBoundPermutationSearch(T);
     bbObj.solve();
     exhaustiveObj.minLossOrder.print();
     std::map<int,int> bbMap=exhaustiveObj.minLossOrder.getMap();
@@ -120,7 +120,7 @@ TEST(branchAndBoundTests, all){
     EXPECT_EQ(bbObj.numLeafNodes,24);
 
     // BB WITH BRANCH CUTTING
-    branchAndBoundPermutationSearch bbObj_cutting = branchAndBoundPermutationSearch(T);
+    BranchAndBoundPermutationSearch bbObj_cutting = BranchAndBoundPermutationSearch(T);
     bbObj_cutting.allowBranchCutting=true;
     bbObj_cutting.solve();
     exhaustiveObj.minLossOrder.print();
@@ -136,19 +136,19 @@ TEST(branchAndBoundTests, all){
     T = getRandomT(6);
     print_matrix(T);
     EXPECT_EQ(T(3,3), 1.);
-    EXPECT_GE(T(3,3), T(3,0)); // Diag dom
-    EXPECT_GE(T(3,3), T(3,1)); // Diag dom
-    EXPECT_GE(T(3,3), T(3,2)); // Diag dom
+    EXPECT_GE(T(3,3), T(3,0)); // Diag largest
+    EXPECT_GE(T(3,3), T(3,1)); // Diag largest
+    EXPECT_GE(T(3,3), T(3,2)); // Diag largest
 
     // Test a bunch of T to make sure exhaustive and branch cutting give the same result
     for (int i=0; i<10; i++){
         T = getRandomT(7);
-        branchAndBoundPermutationSearch exhaustiveObj = branchAndBoundPermutationSearch(T);
+        BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
         exhaustiveObj.solveExhuastive();
         exhaustiveObj.minLossOrder.print();
         std::map<int,int> exhuastiveMap=exhaustiveObj.minLossOrder.getMap();
 
-        branchAndBoundPermutationSearch bbObj = branchAndBoundPermutationSearch(T);
+        BranchAndBoundPermutationSearch bbObj = BranchAndBoundPermutationSearch(T);
         bbObj.solve();
         exhaustiveObj.minLossOrder.print();
         std::map<int,int> bbMap=exhaustiveObj.minLossOrder.getMap();
@@ -156,24 +156,28 @@ TEST(branchAndBoundTests, all){
         EXPECT_EQ(exhuastiveMap,bbMap);
         EXPECT_NEAR(exhaustiveObj.minLossOrder.loss,bbObj.minLossOrder.loss,1E-8);
     }
+    
     // Check with merging. Want to total to be as estimated from formula (see python).
     // 3 -> 13   7 -> 47293
     T = getRandomT(7);
-    branchAndBoundPermutationSearch bbObj_merging = branchAndBoundPermutationSearch(T);
+    BranchAndBoundPermutationSearch bbObj_merging = BranchAndBoundPermutationSearch(T);
     bbObj_merging.allowBranchCutting=false;
     bbObj_merging.allowMerge=true;
     bbObj_merging.solve();
     // Check total scanned
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
-    for (int i=0; i<10; i++){
-        T = getRandomT(20);
-        easy_timer et1 = easy_timer();
-        branchAndBoundPermutationSearch speedObj = branchAndBoundPermutationSearch(T);
+    easy_timer et1 = easy_timer();
+    for (int i=0; i<1000; i++){
+        T = getRandomT(15,false);
+        
+        BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
         speedObj.allowBranchCutting=true;
         speedObj.allowMerge=false;
         speedObj.solve();
         //speedObj.minLossOrder.print();
-        et1.print_time();
     }
+    std::cout << "Time for 1000 trials at 15x15: " << std::endl;
+    EXPECT_LE(et1.time() , 10.); // Expect less than a second
+    et1.print_time();
 }

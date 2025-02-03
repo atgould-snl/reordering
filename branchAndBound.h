@@ -15,7 +15,7 @@ using BlockNormsViewType = Kokkos::View<double**>; //GaussSeidelBlockReorderPrec
 
 std::map<int,int> branchAndBoundLossMinimizationBlockPermutation(BlockNormsViewType& blockNorms, bool verbose=false); // Function interface, this makes the reordering object, runs it, and extracts the map
 
-struct partialOrder
+struct PartialOrder
 {
     // FIELDS
     std::vector<std::optional<int>> blocks; // List of lists of doubles
@@ -24,10 +24,7 @@ struct partialOrder
     int nMembers;
     
     // CONSTRUCTION
-    partialOrder(int initialn=0, double initialLoss=0.0, int initialnBlock=0, int initialnMember=0) : blocks(std::vector<std::optional<int>>(initialn)), loss(initialLoss) , nBlocks(initialnBlock), nMembers(initialnMember){} 
-    // As copy
-    //partialOrder(const partialOrder& other) 
-    //    : blocks(other.blocks), loss(other.loss), nBlocks(other.nBlocks), nMembers(other.nMembers) {}
+    PartialOrder(int initialn=0, double initialLoss=0.0, int initialnBlock=0, int initialnMember=0) : blocks(std::vector<std::optional<int>>(initialn)), loss(initialLoss) , nBlocks(initialnBlock), nMembers(initialnMember){} 
 
     // PRINTING
     void print() const {
@@ -60,41 +57,34 @@ struct partialOrder
     }
 };
 
-class branchAndBoundPermutationSearch
+class BranchAndBoundPermutationSearch
 {
 public:
-    branchAndBoundPermutationSearch(BlockNormsViewType& blockNorms);
+    BranchAndBoundPermutationSearch(BlockNormsViewType& blockNorms);
     BlockNormsViewType& blockNorms;
     int n=0;
     bool allowMerge=false;
     bool allowBranchCutting=false;
-    std::vector<int> memberPresort;
-    std::vector<double> remainingLossLowerBound;
 
     // Results tracking
-    partialOrder minLossOrder = partialOrder(n, std::numeric_limits<double>::max());
-    //double minLoss = std::numeric_limits<double>::max();
+    PartialOrder minLossOrder = PartialOrder(n, std::numeric_limits<double>::max());
     int numInternalNodes = 0;
     int numLeafNodes = 0;
     int terminateSearchAfterNumLeafNodes = 1E6;
     bool earlyTerminationWarning=false;
 
+    // User interface methods
     void solve(); // After problem is set up, calls the private recursive function
     void solveExhuastive();
-    
+
     private:
-        //void add_to_order( , bool prevMin=true);
-        //void 
-        void addToOrder(const partialOrder& order, bool prevBest=true);
-        void insertMember(partialOrder& order, const int newMember, const int intoBlock, const bool merge);
-        void updateLoss(partialOrder& order);
-        bool compareCandidateOrder(partialOrder& newOrder); // Compares orders and replaces if the new one is lower cost
-        //double lowerTriangularLoss(BlockNormsViewType& blockNorms, partialOrder);
+        // Methods
+        void addToOrder(const PartialOrder& order, bool prevBest=true);
+        void insertMember(PartialOrder& order, const int newMember, const int intoBlock, const bool merge);
+        void updateLoss(PartialOrder& order);
+        bool compareCandidateOrder(PartialOrder& newOrder); // Compares orders and replaces if the new one is lower cost
+
+        // Internal vars
+        std::vector<int> memberPresort;
+        std::vector<double> remainingLossLowerBound;
 };
-
-
-//void update_score_vector_mat(std::vector<double>& T, int n, order& order_now);
-//Kokkos::View<double**> create_random_T(int n);
-//void print_matrix(const Kokkos::View<double**>& T);
-//std::vector<double> kokkos_to_vector(const Kokkos::View<double**>& T);
-//order find_optimal_order_exhaustive(Kokkos::View<double**>& T);
