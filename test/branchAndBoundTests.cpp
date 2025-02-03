@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include "../common.h"
-#include "../exhaustive.h"
 #include "../branchAndBound.h"
 #include "Kokkos_Core.hpp"
 
@@ -71,6 +70,19 @@ Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3
     }
 
     return kokkosView;
+}
+
+void print_matrix(const Kokkos::View<double**>& T) {
+    const int numRows = T.extent(0);
+    const int numCols = T.extent(1);
+
+    // Print the matrix
+    for (int i = 0; i < numRows; ++i) {
+        for (int j = 0; j < numCols; ++j) {
+            std::cout << T(i, j) << " "; // Accessing T(i, j)
+        }
+        std::cout << std::endl;
+    }
 }
 
 TEST(branchAndBoundTests, all){

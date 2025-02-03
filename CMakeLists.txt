@@ -15,7 +15,6 @@ include_directories(${Trilinos_INCLUDE_DIRS})
 link_directories(${Trilinos_LIBRARY_DIRS})
 
 set(Sources
-    exhaustive.cpp
     branchAndBound.cpp
 )
 add_executable(${This} main.cpp ${Sources})
