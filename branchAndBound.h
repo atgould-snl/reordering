@@ -70,7 +70,7 @@ public:
     PartialOrder minLossOrder = PartialOrder(n, std::numeric_limits<double>::max());
     int numInternalNodes = 0;
     int numLeafNodes = 0;
-    int terminateSearchAfterNumLeafNodes = 1E6;
+    int terminateSearchAfterNumNodes = 1E6;
     bool earlyTerminationWarning=false;
 
     // User interface methods
@@ -79,7 +79,7 @@ public:
 
     private:
         // Methods
-        void addToOrder(const PartialOrder& order, bool prevBest=true);
+        void addToOrder(const PartialOrder& order);
         void insertMember(PartialOrder& order, const int newMember, const int intoBlock, const bool merge);
         void updateLoss(PartialOrder& order);
         bool compareCandidateOrder(PartialOrder& newOrder); // Compares orders and replaces if the new one is lower cost

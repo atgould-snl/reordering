@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <iostream>
 #include "../common.h"
 #include "../branchAndBound.h"
 #include "Kokkos_Core.hpp"
@@ -135,7 +136,7 @@ TEST(branchAndBoundTests, all){
     BranchAndBoundPermutationSearch bbObj_cutting = BranchAndBoundPermutationSearch(T);
     bbObj_cutting.allowBranchCutting=true;
     bbObj_cutting.solve();
-    exhaustiveObj.minLossOrder.print();
+    bbObj_cutting.minLossOrder.print();
     std::map<int,int> bbMap_cutting=exhaustiveObj.minLossOrder.getMap();
     EXPECT_EQ(bbMap_cutting,solnMap);
     EXPECT_NEAR(exhaustiveObj.minLossOrder.loss,bbObj_cutting.minLossOrder.loss,1E-8);
@@ -153,7 +154,7 @@ TEST(branchAndBoundTests, all){
     EXPECT_GE(T(3,3), T(3,2)); // Diag largest
 
     // Test a bunch of T to make sure exhaustive and branch cutting give the same result
-    for (int i=0; i<10; i++){
+    for (int i=0; i<100; i++){
         T = getRandomT(7);
         BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
         exhaustiveObj.solveExhuastive();
@@ -161,8 +162,9 @@ TEST(branchAndBoundTests, all){
         std::map<int,int> exhuastiveMap=exhaustiveObj.minLossOrder.getMap();
 
         BranchAndBoundPermutationSearch bbObj = BranchAndBoundPermutationSearch(T);
+        bbObj.allowBranchCutting=true;
         bbObj.solve();
-        exhaustiveObj.minLossOrder.print();
+        bbObj.minLossOrder.print();
         std::map<int,int> bbMap=exhaustiveObj.minLossOrder.getMap();
 
         EXPECT_EQ(exhuastiveMap,bbMap);
@@ -180,16 +182,26 @@ TEST(branchAndBoundTests, all){
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
     easy_timer et1 = easy_timer();
-    for (int i=0; i<1000; i++){
-        T = getRandomT(15,false);
-        
+    for (int i=0; i<10; i++){
+        T = getRandomT(15,true);
+        easy_timer et2 = easy_timer();
         BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
         speedObj.allowBranchCutting=true;
         speedObj.allowMerge=false;
         speedObj.solve();
+        std::cout << "Solved problem with:" << std::endl;
+        et2.print_time();
+        std::cout << "Leaves:" << std::endl;
+        std::cout << speedObj.numLeafNodes << std::endl;
+        std::cout << "Forks:" << std::endl;
+        std::cout << speedObj.numInternalNodes;
+        std::cout << std::endl;
+        et2.restart();
+        //print_matrix(T);
+
         //speedObj.minLossOrder.print();
     }
-    std::cout << "Time for 1000 trials at 15x15: " << std::endl;
+    std::cout << "Time for 10 trials at 15x15: " << std::endl;
     EXPECT_LE(et1.time() , 10.); // Expect less than a second
     et1.print_time();
 }

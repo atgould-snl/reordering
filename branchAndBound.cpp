@@ -65,24 +65,28 @@ void BranchAndBoundPermutationSearch::solve(){
 
     // Make recursive call to add to order
     PartialOrder base = PartialOrder(n);
-    addToOrder(base, true);
+    addToOrder(base);
     if (earlyTerminationWarning){
-        std::cout << "WARNING: search terminated early after checking " << terminateSearchAfterNumLeafNodes << " orders." << std::endl;
+        std::cout << "WARNING: search terminated early after checking " << terminateSearchAfterNumNodes << " nodes." << std::endl;
     }
 }
 
-void BranchAndBoundPermutationSearch::addToOrder(const PartialOrder& order, bool prevBest){
+void BranchAndBoundPermutationSearch::addToOrder(const PartialOrder& order){
+    // Early stopping
+    if (numLeafNodes+numInternalNodes>terminateSearchAfterNumNodes){ // TODO add time limit
+        earlyTerminationWarning=true;
+        return;
+    }
+
     numInternalNodes++;
     // Allocate for branches
     int nBranches=order.nBlocks+1; // Insert between existing blocks and before and after
-    bool preventFrontBackBranches = allowBranchCutting && !prevBest;
-    nBranches+=preventFrontBackBranches ? -2 : 0; // No need for branches for new member inserted before or after all previous if it wasn't the best performer previously
     nBranches+=allowMerge ? order.nBlocks : 0; // Additional branches to allow for merging
     std::vector<PartialOrder> branchOrders = std::vector<PartialOrder>(nBranches,PartialOrder(order)); // Fill with copies. Preallocated for speed
 
     // Insert into branches
     int branchIdx=0;
-    for (int addAsBlock=(preventFrontBackBranches ? 1 : 0); addAsBlock < order.nBlocks+(preventFrontBackBranches ? 0 : 1); addAsBlock++){
+    for (int addAsBlock=0; addAsBlock < order.nBlocks+1; addAsBlock++){
         insertMember(branchOrders[branchIdx],memberPresort[order.nMembers],addAsBlock,false);
         branchIdx++;
     }
@@ -98,23 +102,32 @@ void BranchAndBoundPermutationSearch::addToOrder(const PartialOrder& order, bool
 
     // Are we at the bottom of the recursion?
     if (branchOrders[0].nMembers == n){
+
+        /*
+        // TESTING ONLY
+        double lb_max=remainingLossLowerBound[0];
+        PartialOrder order_cp=branchOrders[0];
+        updateLoss(order_cp);
+        double eps=0.000001;
+        double ground_up=order_cp.loss;
+        assert(ground_up + eps > branchOrders[0].loss );
+        assert(ground_up - eps < branchOrders[0].loss );
+        assert(lb_max - eps <= branchOrders[0].loss);
+        // END TESTING ONLY
+        */
+
         compareCandidateOrder(branchOrders[0]);
         numLeafNodes+=nBranches; // All of these branches are terminal
         return;
     }
 
     // Loop through the sorted branches and make recursive call
-    bool best=true;
+
     for (auto branchOrder : branchOrders){
         // Make the recursive call
         if (!allowBranchCutting || branchOrder.loss + remainingLossLowerBound[branchOrder.nMembers] < minLossOrder.loss){ // Test if branch should be cut
-            if (numLeafNodes>terminateSearchAfterNumLeafNodes){ // TODO add time limit
-                earlyTerminationWarning=true;
-                return;
-            }
-            addToOrder(branchOrder,best);
+            addToOrder(branchOrder);
         }
-        best=false;
     }
 }
 
@@ -144,8 +157,7 @@ void BranchAndBoundPermutationSearch::updateLoss(PartialOrder& order){
             if (order.blocks[i] && order.blocks[j]){
                 if (order.blocks[i] > order.blocks[j]){
                     // Physics j with lower block number cannot impact physics i with higher block number, so add it to cost
-                    double v = blockNorms(i, j); // Look to the left of ()
-                    order.loss += v * v;
+                    order.loss += blockNorms(i, j); // Look to the left of ()
                 }
             }
         }
@@ -185,7 +197,7 @@ void BranchAndBoundPermutationSearch::insertMember(PartialOrder& order, const in
         else if (order.blocks[newMember] < order.blocks[member]){
             v = blockNorms(member, newMember); // Below
         }
-        order.loss += v * v;
+        order.loss += v;
     }
 }
 
