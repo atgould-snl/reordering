@@ -1,2 +1,2 @@
 # trilinos-build-example
-An example demonstrating how to set-up an in-tree source build of trilinos
+This code defines a class to perform and branch and bound linear ordering search.
