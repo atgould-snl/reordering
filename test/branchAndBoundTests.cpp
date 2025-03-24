@@ -182,13 +182,19 @@ TEST(branchAndBoundTests, all){
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
     easy_timer et1 = easy_timer();
-    for (int i=0; i<10; i++){
-        T = getRandomT(15,true);
+    int trials=10;
+    int n=13;
+    int total_nodes = 0;
+    for (int i=0; i<n; i++){
+
+        T = getRandomT(16,true);
         easy_timer et2 = easy_timer();
         BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
         speedObj.allowBranchCutting=true;
         speedObj.allowMerge=false;
         speedObj.solve();
+
+        // Report results
         std::cout << "Solved problem with:" << std::endl;
         et2.print_time();
         std::cout << "Leaves:" << std::endl;
@@ -196,12 +202,13 @@ TEST(branchAndBoundTests, all){
         std::cout << "Forks:" << std::endl;
         std::cout << speedObj.numInternalNodes;
         std::cout << std::endl;
+        total_nodes+=speedObj.numInternalNodes+speedObj.numLeafNodes;
         et2.restart();
         //print_matrix(T);
 
         //speedObj.minLossOrder.print();
     }
-    std::cout << "Time for 10 trials at 15x15: " << std::endl;
+    std::cout << std::endl << "Ave time for " << trials << " trials at "<< n <<"x"<< n <<": " << et1.time() /trials << std::endl;
+    std::cout << "Ave nodes : " << total_nodes/trials << std::endl;
     EXPECT_LE(et1.time() , 10.); // Expect less than a second
-    et1.print_time();
 }

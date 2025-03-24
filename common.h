@@ -12,7 +12,6 @@
 
 #include "Kokkos_Core.hpp"
 
-
 ////////////////// EASY TIMER ///////////////////
 class easy_timer{ // Use as  easy_timer main_time=easy_timer();   then     main_time.print_time();    e.g.
 public:
