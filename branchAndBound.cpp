@@ -1,214 +1,188 @@
 #include "common.h"
 #include "branchAndBound.h"
+#include "blackBoxLop.cpp"
 #include <algorithm>
 #include <cassert>
+#include <limits>
+#include <utility>
 
+void STK_ThrowRequire(bool condition){ if (condition){ throw "Condition not met";}}
 
-// FUNCTION DEFINITION
-std::map<int,int> branchAndBoundLossMinimizationBlockPermutation(BlockNormsViewType& blockNorms, bool verbose){
-    // Create the object
-    BranchAndBoundPermutationSearch bb = BranchAndBoundPermutationSearch(blockNorms);
-    bb.allowBranchCutting=true;
-
-    // Run reordering
-    bb.solve();
-
-    // Print results
-    if (verbose){
-        bb.minLossOrder.print();
-    }
-
-    return bb.minLossOrder.getMap();
-}
-
-// CLASS DEFINITION
-BranchAndBoundPermutationSearch::BranchAndBoundPermutationSearch(BlockNormsViewType& blockNorms)
-    : blockNorms(blockNorms)
-{
-    n = blockNorms.extent(0);
-}
-
-void BranchAndBoundPermutationSearch::solve(){
-    // Precompute the lower bounds
-    // Find the presort order to add members
-    auto memberImportance=std::vector<double>(n,0);
-    for (int member=0; member<n; member++){
-        for (int otherMember=0; otherMember<n; otherMember++){
-            memberImportance[member]+=std::abs(blockNorms(member,otherMember)-blockNorms(otherMember,member));
+// BUCKET OPTION CLASS, CONT
+class BucketingOption {
+    public:
+      BucketingOption(const BlockNormsViewType & blockNorms, const std::vector<int> & addition_order, const double tMaxWalltime)
+      : blockNorms(blockNorms),
+      tMaxWalltime(tMaxWalltime)
+      {
+        N = int(addition_order.size());
+        // Initialize buckets with 1 physics each
+        for (int physics_number = 0; physics_number < N; ++physics_number) {
+          buckets.push_back(std::set<int>{physics_number});
         }
-    }
-    // Argsort
-    memberPresort=std::vector<int>(n);
-    std::iota(memberPresort.begin(), memberPresort.end(), 0);
-    std::sort(memberPresort.begin(),memberPresort.end(), [&memberImportance](const int memberA, const int memberB){return memberImportance[memberA] > memberImportance[memberB];}); // More important members get a true and go first
+        // No buckets are stable
+        nStableBuckets=0;
+      }
 
-    // Lower bound based on add order
-    remainingLossLowerBound=std::vector<double>(n);
-    double totalLossLowerBound=0;
-    for (int memberIdx=n-1; memberIdx>=0; memberIdx--){ // Loop backwards for cumsum
-        // What is the min loss relative to all of the members before it
-        for (int otherMemberIdx=0; otherMemberIdx<memberIdx; otherMemberIdx++){ // Min cost due to interaction w all previous members on list
-            // Find the min loss of adding it
-            double additionalLoss = std::min(blockNorms(memberPresort[memberIdx],memberPresort[otherMemberIdx]),blockNorms(memberPresort[otherMemberIdx],memberPresort[memberIdx]));
-            if (allowMerge){
-                // Test option to merge
-                // TESTING ONLY TODO
-                //assert(false);
-                double mergeLoss=0;
-                additionalLoss = std::min(additionalLoss,mergeLoss);
-            }
-            totalLossLowerBound+=additionalLoss;
-        }
-        // Save running total
-        remainingLossLowerBound[memberIdx]=totalLossLowerBound;
-    }
-
-    // Make recursive call to add to order
-    PartialOrder base = PartialOrder(n);
-    addToOrder(base);
-    if (earlyTerminationWarning){
-        std::cout << "WARNING: search terminated early after checking " << terminateSearchAfterNumNodes << " nodes." << std::endl;
-    }
-}
-
-void BranchAndBoundPermutationSearch::addToOrder(const PartialOrder& order){
-    // Early stopping
-    if (numLeafNodes+numInternalNodes>terminateSearchAfterNumNodes){ // TODO add time limit
-        earlyTerminationWarning=true;
-        return;
-    }
-
-    numInternalNodes++;
-    // Allocate for branches
-    int nBranches=order.nBlocks+1; // Insert between existing blocks and before and after
-    nBranches+=allowMerge ? order.nBlocks : 0; // Additional branches to allow for merging
-    std::vector<PartialOrder> branchOrders = std::vector<PartialOrder>(nBranches,PartialOrder(order)); // Fill with copies. Preallocated for speed
-
-    // Insert into branches
-    int branchIdx=0;
-    for (int addAsBlock=0; addAsBlock < order.nBlocks+1; addAsBlock++){
-        insertMember(branchOrders[branchIdx],memberPresort[order.nMembers],addAsBlock,false);
-        branchIdx++;
-    }
-    if (allowMerge){
-        for (int addIntoBlock=0; addIntoBlock < order.nBlocks; addIntoBlock++){
-            insertMember(branchOrders[branchIdx],memberPresort[order.nMembers],addIntoBlock,true);
-            branchIdx++;
-        }
-    }
-    assert(branchIdx==nBranches); // Make sure we got them all
-    // Sort branches
-    std::sort(branchOrders.begin(), branchOrders.end(),[](const PartialOrder& branchA, const PartialOrder& branchB){return branchA.loss < branchB.loss;});
-
-    // Are we at the bottom of the recursion?
-    if (branchOrders[0].nMembers == n){
-
-        /*
-        // TESTING ONLY
-        double lb_max=remainingLossLowerBound[0];
-        PartialOrder order_cp=branchOrders[0];
-        updateLoss(order_cp);
-        double eps=0.000001;
-        double ground_up=order_cp.loss;
-        assert(ground_up + eps > branchOrders[0].loss );
-        assert(ground_up - eps < branchOrders[0].loss );
-        assert(lb_max - eps <= branchOrders[0].loss);
-        // END TESTING ONLY
-        */
-
-        compareCandidateOrder(branchOrders[0]);
-        numLeafNodes+=nBranches; // All of these branches are terminal
-        return;
-    }
-
-    // Loop through the sorted branches and make recursive call
-
-    for (auto branchOrder : branchOrders){
-        // Make the recursive call
-        if (!allowBranchCutting || branchOrder.loss + remainingLossLowerBound[branchOrder.nMembers] < minLossOrder.loss){ // Test if branch should be cut
-            addToOrder(branchOrder);
-        }
-    }
-}
-
-void BranchAndBoundPermutationSearch::solveExhuastive(){
-    // Loop through all permutations
-
-    // Start with a vector of counting numbers
-    PartialOrder order(n,0,n);
-    std::iota(order.blocks.begin(), order.blocks.end(), 0);
-
-    do {
-        // Score
-        updateLoss(order);
-        // Compare
-        compareCandidateOrder(order);
-        numLeafNodes++;
-        // Permute
-    } while (std::next_permutation(order.blocks.begin(), order.blocks.end()));
-    return;
-}
-
-void BranchAndBoundPermutationSearch::updateLoss(PartialOrder& order){
-    order.loss=0; // Starting from scratch
-    // Loop through potential vector
-    for (int i=0; i<n; i++){ // Loop through rows
-        for (int j=0; j<n; j++){ // Loop through cols
-            if (order.blocks[i] && order.blocks[j]){
-                if (order.blocks[i] > order.blocks[j]){
-                    // Physics j with lower block number cannot impact physics i with higher block number, so add it to cost
-                    order.loss += blockNorms(i, j); // Look to the left of ()
-                }
+      // Getters
+      [[nodiscard]] double get_cost() const {return cost;} // TODO make sure protection is correct
+      [[nodiscard]] double get_nMerge() const {return N-int(buckets.size());}
+      [[nodiscard]] int get_nStableBuckets() const {return nStableBuckets;}
+      [[nodiscard]] auto get_map() const {STK_ThrowRequire(cost_is_current); return physics_to_block_map;}
+      //STK_ThrowRequire(cost_is_current); 
+      
+      void runLOP(){
+        updateOrder(); // RUNS LOP
+        updateCost(); // Based on new order
+        updateMap(); // Based on new order
+        cost_is_current=true;
+      }
+      std::vector<BucketingOption*> makeChildren(){ // Second returns a list of children sorted by potential
+        STK_ThrowRequire(cost_is_current);
+        // Make children by greedy merge selection
+        // First find L*, the larges lower diagonal term associated with a non-stable bucket
+        double L_star=std::numeric_limits<double>::max();
+        int a_star;
+        for (unsigned long a=nStableBuckets; a < buckets.size(); a++){ // Loop through non-stable only
+            for (unsigned long b; b < buckets.size(); b++){
+                if (order[a]<=order[b]) {continue;} // Filter out nonLD blocks. (for <>, concider if order=0,1,2,3... a<b is an UD BLOCK)
+                double L = bucketSum(a,b);
+                if (L < L_star){ L_star = L; a_star = a;}
             }
         }
-    }
-}
+        // Create a child where a_star is merged to each stable block, tracking the potential of each.
+        children = std::vector<BucketingOption>(nStableBuckets+1, *this); // Make copies of self
+        std::vector<double> potentials = std::vector<double>(nStableBuckets+1);
+        for (unsigned long b; b < nStableBuckets; b++){
+            potentials[b] = bucketSum(a_star,b);
+            children[b].merge(a_star,b);
+        }
+        // Create child where a_star gets its own bucket
+        children[nStableBuckets].newBucket(a_star);
 
-void BranchAndBoundPermutationSearch::insertMember(PartialOrder& order, const int newMember, const int intoBlock, const bool merge){
-    // MAKE INSERTION
-    // Update with new member
-    assert(!order.blocks[newMember]); // Make sure this member has not already been assigned
-    if (!merge){ // Bump higher blocks forward
-        order.nBlocks++;
-        for (int member=0; member<n; member++){
-            if (!order.blocks[member]) continue;
-            if (order.blocks[member] >= intoBlock){
-                order.blocks[member].value()++; // Bumped up by new insertion
+        // Sort the list by potential
+      }
+      void merge(int a_star, int b){
+        STK_ThrowRequire( a_star > b);
+        STK_ThrowRequire( a_star > nStableBuckets - 1);
+        STK_ThrowRequire( a_star < int(buckets.size()));
+        STK_ThrowRequire( 1 == int(buckets[a_star].size()));
+        buckets[b].insert(buckets[a_star].begin(), buckets[a_star].end());
+        buckets.erase(buckets.begin()+a_star);
+        cost_is_current = false;
+      }
+      void newBucket(int a_star){ // but a_star into the stable buckets
+        STK_ThrowRequire( a_star > nStableBuckets - 1);
+        STK_ThrowRequire( a_star < int(buckets.size()));
+        STK_ThrowRequire( 1 == int(buckets[a_star].size()));
+        std::set<int> tempBucket = buckets[nStableBuckets];
+        buckets[nStableBuckets]=buckets[a_star];
+        buckets[a_star]=tempBucket; // Ok if a_star = nStableBuckets
+        nStableBuckets++;
+        cost_is_current = false;
+      }
+
+      // Overload the < opp for BucketingOptions
+      bool operator<(const BucketingOption& other) const {
+        if (get_nMerge() != other.get_nMerge()){ return get_nMerge() < other.get_nMerge();} // Merge count is first priority
+        return cost < other.get_cost(); // Second look to cost
+      }
+    
+    private:
+      BlockNormsViewType blockNorms;
+      double tMaxWalltime;
+      std::vector<std::set<int>> buckets;
+      int nStableBuckets;
+      std::map<int,int> physics_to_block_map;
+      std::vector<int> order;
+      double cost;
+      int N;
+      std::vector<BucketingOption> children;
+      bool cost_is_current = false;
+      double bucketSum(int a,int b){
+        double T;
+        for (const auto& i : buckets[a]) { 
+            for (const auto& j : buckets[b]){
+              T += std::pow(blockNorms(i,j),2);
             }
         }
-    }
-    order.blocks[newMember]=intoBlock;
-    order.nMembers++;
+        return T;
+      }
+      void updateOrder(){
+        BlockNormsViewType tournament("normalForm", buckets.size(), buckets.size());
+        // Tournament based on the buckets
+        for (unsigned long a=0; a < buckets.size(); a++){
+          for (unsigned long b=0; b < buckets.size(); b++){
+            if (a>b) { continue;} // Block is below diag, filter out
+            if (a==b) { 
+              tournament(a,a)=0;
+              continue;
+            }
+            // Sum block above diag
+            double T=0;
+            T += bucketSum(a,b);
 
-    // Update score due to new member
-    if (merge){
-        order.blocks[newMember]=intoBlock;
-        // TODO update score due to merge
-        //assert(false);
-        double mergeLoss=0; // TESTING ONLY
-        order.loss += mergeLoss;
-    }
-    for (int member=0; member<n; member++){ // Loop through members
-        if (!order.blocks[member]) continue; // Has this member been assigned yet?
-        double v=0; // Default, used within the same block
-        if (order.blocks[newMember] > order.blocks[member]){
-            v = blockNorms(newMember, member); // To the left
+            // Take away sum of block below diag
+            T -= bucketSum(b, a);
+            tournament(a,b) = T;
+            tournament(b,a) = -T;
+          }
         }
-        else if (order.blocks[newMember] < order.blocks[member]){
-            v = blockNorms(member, newMember); // Below
+        // Call the LOP solver
+        LinearOrderingSolver solver{tournament, tMaxWalltime}; // Is communicator pulled in from the namespace??
+        solver.solve();
+        order = solver.order();
+      }
+  
+      void updateMap(){
+        for (unsigned long bucket_rank=0; bucket_rank<buckets.size(); bucket_rank++){
+          auto bucket = buckets[order[bucket_rank]];
+          for (const auto& physics_block : bucket) {
+            physics_to_block_map[physics_block] = int(bucket_rank);
+          }
         }
-        order.loss += v;
-    }
-}
-
-bool BranchAndBoundPermutationSearch::compareCandidateOrder(PartialOrder& newOrder){
-    // Check that the order is complete
-    assert(newOrder.nBlocks=n);
-    for (auto block : newOrder.blocks){assert(block);}
-    // Compare
-    if (newOrder.loss < minLossOrder.loss){
-        minLossOrder=newOrder;
-        return true;
-    }
-    return false;
-}
+      }
+  
+      void updateCost(){ // Find the score based on the order
+        cost=0;
+        for (unsigned long a=0; a < buckets.size(); a++){
+          for (unsigned long b=0; b < buckets.size(); b++){
+            cost += order[a]>order[b] ? bucketSum(a,b) : 0;
+          }
+        }
+      }
+  };
+  
+  class BucketOrderingSolver {
+    public:
+      BucketOrderingSolver(const BlockNormsViewType & blockNorms, double tMaxWalltime)
+      : blockNorms(blockNorms),
+      tMaxWalltime(tMaxWalltime)
+      {
+        N = int(blockNorms.extent(0));
+      }
+      void solve(){
+        std::vector<int> memberPresort=std::vector<int>(N);
+        std::iota(memberPresort.begin(), memberPresort.end(), 0); // Just make a vector from 0 to N-1 for now
+  
+        BucketingOption base = BucketingOption(blockNorms,memberPresort, tMaxWalltime);
+        addToOrder(base);
+      }
+    private:
+      BlockNormsViewType blockNorms;
+      double tMaxWalltime;
+      int N;
+      void addToOrder(const BucketingOption & base){
+        std::vector<BucketingOption> branchOptions = std::vector<BucketingOption>(base.get_nStableBuckets(), base); // Fill with copies. Preallocated for speed
+        std::vector<double> potentials;
+        for (int intoBucket=0; intoBucket <= base.get_nStableBuckets(); intoBucket ++){
+          potentials.push_back(branchOptions[intoBucket].potentialOfAddingNextPhysicsToBucket(intoBucket));
+        }
+        // Sort so highest potential goes first
+        std::vector<int> branchPriority=std::vector<int>(N);
+        std::iota(branchPriority.begin(), branchPriority.end(), 0); // Just make a vector from 0 to N-1 for now
+        std::sort(branchPriority.begin(), branchPriority.end(),[&potentials](const int b1, const int b2){return potentials[b1] > potentials[b2];}); // More potential gets a true and goes first
+        // Start with the highest priority branch, if its possible that it 
+      }
+      
+  };

@@ -9,8 +9,11 @@
 #include <cmath>
 #include <utility>
 #include <chrono> // easy timer
+#include <set>
 
 #include "Kokkos_Core.hpp"
+
+using BlockNormsViewType = Kokkos::View<double**>; //GaussSeidelBlockReorderPreconditionerFactory::BlockNormsViewType;
 
 ////////////////// EASY TIMER ///////////////////
 class easy_timer{ // Use as  easy_timer main_time=easy_timer();   then     main_time.print_time();    e.g.
