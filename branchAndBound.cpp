@@ -9,10 +9,12 @@
 
 void STK_ThrowRequire(bool condition){ if (condition){ throw "Condition not met";}}
 
+class BucketOrderingSolver;
+
 // BUCKET OPTION CLASS, CONT
 class BucketingOption {
     public:
-      BucketingOption(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const std::vector<int> & addition_order, const double tMaxWalltime)
+      BucketingOption(const BucketOrderingSolver* prob)
       : blockNorms(blockNorms),
       blockMergeCosts(blockMergeCosts), // Merge cost will be added from both i,j and j,i when i and j merge
       tMaxWalltime(tMaxWalltime)
@@ -31,11 +33,10 @@ class BucketingOption {
       [[nodiscard]] double get_cost() const {return cost;} // TODO make sure protection is correct
       [[nodiscard]] double get_nMerge() const {return N-int(buckets.size());}
       [[nodiscard]] int get_nStableBuckets() const {return nStableBuckets;}
-      [[nodiscard]] auto get_map() const {STK_ThrowRequire(cost_is_current); return physics_to_block_map;}
+      [[nodiscard]] auto get_map() const {return physics_to_block_map;}
       //STK_ThrowRequire(cost_is_current); 
 
       std::vector<BucketingOption> makeChildren() const{ // List of children with potentials, last child is no merge
-        STK_ThrowRequire(cost_is_current);
         // Make children by greedy merge selection
         // First find L*, the larges lower diagonal term associated with a non-stable bucket
         auto [a_star, L_star] = get_a_star_L_star();
@@ -46,7 +47,6 @@ class BucketingOption {
         }
         // Create child where a_star gets its own bucket
         children[nStableBuckets].newBucket(a_star);
-
         return std::move(children); // Move to not make a copy
       }
       void merge(int a_star, int b){
@@ -54,10 +54,9 @@ class BucketingOption {
         STK_ThrowRequire( a_star > nStableBuckets - 1);
         STK_ThrowRequire( a_star < int(buckets.size()));
         STK_ThrowRequire( 1 == int(buckets[a_star].size()));
-        potential = order[a_star]>order[b] ? bucketSum(a_star, b) : bucketSum(b, a_star);
         buckets[b].insert(buckets[a_star].begin(), buckets[a_star].end());
         buckets.erase(buckets.begin()+a_star);
-        cost_is_current = false;
+        runLOP();
       }
       void newBucket(int a_star){ // but a_star into the stable buckets
         STK_ThrowRequire( a_star > nStableBuckets - 1);
@@ -67,10 +66,7 @@ class BucketingOption {
         buckets[nStableBuckets]=buckets[a_star];
         buckets[a_star]=tempBucket; // Ok if a_star = nStableBuckets
         nStableBuckets++;
-        // Assign potential of the highest next availible merge by finding a new a_star
-        auto [a_star_next, L_star] = get_a_star_L_star();
-        potential = L_star;
-        cost_is_current = false;
+        runLOP(); // TODO easy optimization would be to remove this since the we already know how the order will change
       }
       // Overload the < opp for BucketingOptions
       bool operator<(const BucketingOption& other) const {
@@ -85,9 +81,6 @@ class BucketingOption {
       }
     
     private:
-      BlockNormsViewType blockNorms;
-      BlockNormsViewType blockMergeCosts; // All 1s for now
-      double tMaxWalltime;
       std::vector<std::set<int>> buckets;
       int nStableBuckets;
       std::map<int,int> physics_to_block_map;
@@ -95,22 +88,19 @@ class BucketingOption {
       std::vector<int> order;
       double cost;
       double mergeCost;
-      double potential;
-      int N;
-      bool cost_is_current = false;
+      BucketOrderingSolver* problem;
 
       void runLOP(){
         updateOrder(); // RUNS LOP
         updateCost(); // Based on new order
         updateMergeCost(); // Based on bucketing only
         updateMap(); // Based on new order
-        cost_is_current=true;
       }
       double bucketSum(int a, int b) const {
         double T;
         for (const auto& i : buckets[a]) { 
             for (const auto& j : buckets[b]){
-              T += std::pow(blockNorms(i,j),2);
+              T += std::pow(problem->blockNorms(i,j),2);
             }
         }
         return T;
@@ -196,11 +186,13 @@ class BucketingOption {
       {
         N = int(blockNorms.extent(0));
       }
+
+
       void solve(){
         std::vector<int> memberPresort=std::vector<int>(N);
         std::iota(memberPresort.begin(), memberPresort.end(), 0); // Just make a vector from 0 to N-1 for now
   
-        BucketingOption base = BucketingOption(blockNorms,memberPresort, tMaxWalltime);
+        BucketingOption base = BucketingOption(blockNorms, memberPresort, tMaxWalltime);
         addToOrder(base);
       }
     private:
