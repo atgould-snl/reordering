@@ -1,12 +1,70 @@
-#pragma once
+#ifndef BUCKET_SOLVER_H
+#define BUCKET_SOLVER_H
+
 #include "common.h"
-#include <iostream>
-#include <optional>
+#include "blackBoxLop.cpp"
+
 #include <vector>
+#include <set>
+#include <map>
+#include <utility>
+#include <limits>
+#include <algorithm>
+#include <numeric>
+#include <stdexcept>
 
+class BucketOrderingSolver; // Forward declaration
 
-// using PermutationScoreType = std::pair<PermutationType, double>;
-// using PermutationType = std::map<int, int>;
+class BucketingOption {
+public:
+    BucketingOption(const BucketOrderingSolver* prob);
 
-// Function prototypes
-//std::map<int,int>  doNothing(int a);
+    // Getters
+    [[nodiscard]] auto get_cost() const {return cost;};
+    [[nodiscard]] auto get_mergeCost() const {return mergeCost;};
+    [[nodiscard]] auto get_nStableBuckets() const {return nStableBuckets;};
+    [[nodiscard]] auto get_map() const {return physics_to_block_map;};
+    [[nodiscard]] auto get_optimisticMergeCostToHitTarget() const {return optimisticMergeCostToHitTarget;};
+
+    std::vector<BucketingOption> makeChildren() const;
+    void merge(int a_star, int b);
+    void newBucket(int a_star);
+    
+    // Overload the < operator for BucketingOptions
+    bool operator<(const BucketingOption& other) const;
+
+private:
+    std::vector<std::set<int>> buckets;
+    int nStableBuckets;
+    std::map<int, int> physics_to_block_map;
+    std::vector<int> order_of_rows;
+    std::vector<int> order;
+    double cost;
+    double mergeCost;
+    double optimisticMergeCostToHitTarget;
+    const BucketOrderingSolver* problem;
+
+    void runLOP();
+    double bucketSum(const int a, const int b, const bool mergeCosts=false) const;
+    std::pair<int, double> get_a_star_L_star() const;
+    void updateOrder();
+    void updateMap();
+    void updateCost();
+    void updateMergeCost();
+    void updateOptimisticMergeCostToHitTarget();
+};
+
+class BucketOrderingSolver {
+public:
+    BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime);
+    const BlockNormsViewType blockNorms;
+    const BlockNormsViewType blockMergeCosts;
+    const double tMaxWalltime;
+    const double costTarget;
+    const int N;
+
+private:
+    void addToOrder(const BucketingOption & base);
+};
+
+#endif // BUCKET_SOLVER_H
