@@ -53,12 +53,10 @@ void BucketingOption::newBucket(int a_star) {
   runLOP(); // TODO: Easy optimization, this could be taken away since the order is impacted in a trivial way
 }
 
-//bool BucketingOption::operator<(const BucketingOption& other) const {
-//  if (mergeCost < other.get_mergeCost()) {
-//      return get_nMerge() < other.get_nMerge(); // Merge count is first priority
-//  }
-//  return cost < other.get_cost(); // Second look to cost
-//}
+bool BucketingOption::operator<(const BucketingOption& other) const { // Sees if one is better than the other
+
+  return optimisticMergeCostToHitTarget > other.get_optimisticMergeCostToHitTarget(); // > instead of < for priority queue
+}
 
 void BucketingOption::runLOP() {
     updateOrder(); // RUNS LOP
@@ -73,6 +71,7 @@ double BucketingOption::bucketSum(const int a, const int b, const bool mergeCost
   STK_ThrowRequire(a!=b);
   for (const auto& i : buckets[a]) { 
       for (const auto& j : buckets[b]) {
+          STK_ThrowRequire(i!=j);
           T += mergeCosts ? problem->blockMergeCosts(i,j)+problem->blockMergeCosts(i,j) : std::pow(problem->blockNorms(i, j), 2);
       }
   }
@@ -193,27 +192,28 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
   optimisticMergeCostToHitTarget = std::numeric_limits<double>::max()/2;
 }
 
-
-
-
-
-
-BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, double costTarget, double tMaxWalltime)
-    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))) {
+BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime)
+    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this)) {
     BucketingOption base = BucketingOption(this); // Pass this to BucketingOption
-    addToOrder(base); // Recursive call
-}
+    std::priority_queue<BucketingOption> optionsQueue;
 
-void BucketOrderingSolver::addToOrder(const BucketingOption & base) {
-  std::vector<BucketingOption> children = base.makeChildren();
-  std::vector<int> childrenPriority=std::vector<int>(children.size());
-  std::iota(childrenPriority.begin(), childrenPriority.end(), 0);
-  // Sort so highest potential goes first
-  std::sort(childrenPriority.begin(), childrenPriority.end(),[&children](const int c1, const int c2){return potentials[b1] > potentials[b2];}); // More potential gets a true and goes first
-  for (auto i:childrenPriority){
-    // Check if child with its potential could be better by comparing to current best
-    children
-    // If so run LOP on it
-    // Check if it still could be better than best
-  }
+    // Add options to the queue
+    optionsQueue.push(base);
+
+    // Process the option with the greatest criteria
+    while (!optionsQueue.empty()) {
+        BucketingOption topOption = optionsQueue.top(); // Get the option with the greatest criteria
+        optionsQueue.pop(); // Remove it from the queue
+
+        // If the target is reached, see if this one is better than the current best
+        if (topOption.get_cost() < costTarget){
+          if (best < topOption || best.get_cost() > costTarget){
+            best = topOption;
+          }
+        }
+        // Otherwise make children from the top option and add them to queue
+        for (const auto & child : topOption.makeChildren()){
+          optionsQueue.push(child);
+        }
+    }
 }

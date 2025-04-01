@@ -2,7 +2,7 @@
 #define BUCKET_SOLVER_H
 
 #include "common.h"
-#include "blackBoxLop.cpp"
+#include "blackBoxLop.h"
 
 #include <vector>
 #include <set>
@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
+#include <queue>
 
 class BucketOrderingSolver; // Forward declaration
 
@@ -62,9 +63,11 @@ public:
     const double tMaxWalltime;
     const double costTarget;
     const int N;
+    [[nodiscard]] auto get_best() const {return best;};
 
 private:
-    void addToOrder(const BucketingOption & base);
+    BucketingOption best;
+    
 };
 
 #endif // BUCKET_SOLVER_H

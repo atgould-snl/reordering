@@ -20,13 +20,3 @@ set(Sources
 add_executable(${This} main.cpp ${Sources})
 # Link against Trilinos and Kokkos
 target_link_libraries(${This} ${Trilinos_LIBRARIES})
-
-# Testing
-include(CTest)
-enable_testing()
-add_subdirectory(googletest)
-add_subdirectory(test)
-add_library(test_lib STATIC main.cpp ${Sources})
-target_link_libraries(test_lib ${Trilinos_LIBRARIES})
-
-

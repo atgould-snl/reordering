@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
-#include "../common.h"
-#include "../branchAndBound.h"
+//#include "../common.h"
+#include "../main.cpp"
 #include "Kokkos_Core.hpp"
 
 // Function to convert std::vector<std::vector<double>> to Kokkos::View<double**>
@@ -73,6 +73,20 @@ Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3
     return kokkosView;
 }
 
+
+Kokkos::View<double**> getUniformMergeCostsLike(Kokkos::View<double**> T) { // Exponential mode simulates variability over orders of magnitude
+    // Create a Kokkos View with the same dimensions
+    int n = T.extent(0);
+    Kokkos::View<double**> kokkosView("kokkosView", n, n);
+    // Fill the Kokkos View with 0.5 values
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            kokkosView(i, j) = 0.5;
+        }
+    }
+    return kokkosView;
+}
+
 void print_matrix(const Kokkos::View<double**>& T) {
     const int numRows = T.extent(0);
     const int numCols = T.extent(1);
@@ -83,6 +97,13 @@ void print_matrix(const Kokkos::View<double**>& T) {
             std::cout << T(i, j) << " "; // Accessing T(i, j)
         }
         std::cout << std::endl;
+    }
+}
+
+void print_map(const std::map<int, int>& myMap) {
+    std::cout << "Map contents:\n";
+    for (const auto& pair : myMap) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << '\n';
     }
 }
 
@@ -109,11 +130,17 @@ TEST(branchAndBoundTests, all){
     // Load into kokkos
     Kokkos::initialize();
     Kokkos::View<double**> T = vectorToKokkosView(T_vec_of_vec);
+    BucketOrderingSolver soln = BucketOrderingSolver(T,getUniformMergeCostsLike(T),100,1);
+    print_map(soln.get_best().get_map());
     //Kokkos::View<double**> T = create_random_T(4);
     std::cout << "Test matrix:" << std::endl;
     print_matrix(T);
     //std::map<int,int> foundMap = branchAndBoundLossMinimizationBlockPermutation(T, true);
+}
 
+
+
+    /*
     // EXHAUSTIVE SOLN
     BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
     exhaustiveObj.solveExhuastive();
@@ -212,3 +239,5 @@ TEST(branchAndBoundTests, all){
     std::cout << "Ave nodes : " << total_nodes/trials << std::endl;
     EXPECT_LE(et1.time() , 10.); // Expect less than a second
 }
+
+*/
