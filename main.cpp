@@ -1,5 +1,281 @@
 #include "branchAndBound.h"
+#include "branchAndBound.cpp" // TODO: THIS SHOULD NOT BE INCLUDED HERE! SHOULD GO IN THE CMAKE
+#include <iostream>
+#include <string>
+#include <vector>
+#include "Kokkos_Core.hpp"
+
+
+
+// Function to convert std::vector<std::vector<double>> to Kokkos::View<double**>
+Kokkos::View<double**> vectorToKokkosView(const std::vector<std::vector<double>>& vec) {
+    // Get the dimensions of the input vector
+    size_t numRows = vec.size();
+    size_t numCols = (numRows > 0) ? vec[0].size() : 0;
+
+    // Create a Kokkos View with the same dimensions
+    Kokkos::View<double**> kokkosView("kokkosView", numRows, numCols);
+
+    // Copy data from std::vector to Kokkos View
+    for (size_t i = 0; i < numRows; ++i) {
+        for (size_t j = 0; j < numCols; ++j) {
+            kokkosView(i, j) = vec[i][j];
+        }
+    }
+    return kokkosView;
+}
+
+Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3.) { // Exponential mode simulates variability over orders of magnitude
+    // Create a Kokkos View with the same dimensions
+    Kokkos::View<double**> kokkosView("kokkosView", n, n);
+
+    // Seed the random number generator
+    std::random_device rd;  // Obtain a random number from hardware
+    std::mt19937 gen(rd());  // Seed the generator
+    std::uniform_real_distribution<> dis(0.0, randMax);  // Define the range
+
+    // Fill the Kokkos View with random values
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            // Generate a random exponent between 1 and maxExp
+            double rand=dis(gen);
+            // Generate a random number in the range [10^1, 10^maxExp]
+            kokkosView(i, j) = expMode ? std::pow(10, rand) : rand;
+        }
+    }
+
+    // Ensure the matrix has highest value (1) on diag
+    for (size_t i = 0; i < n; ++i) {
+        // Find the maximum value in the row
+        double maxVal = kokkosView(i, 0);
+        size_t maxIndex = 0;
+
+        for (size_t j = 1; j < n; ++j) {
+            if (kokkosView(i, j) > maxVal) {
+                maxVal = kokkosView(i, j);
+                maxIndex = j;
+            }
+        }
+
+        // Swap the maximum value with the diagonal element
+        if (maxIndex != i) {
+            std::swap(kokkosView(i, i), kokkosView(i, maxIndex));
+        }
+    }
+
+    // Normalize the matrix based on the diagonal
+    for (size_t i = 0; i < n; ++i) {
+        double diagonalValue = kokkosView(i, i);
+        if (diagonalValue != 0) { // Avoid division by zero
+            for (size_t j = 0; j < n; ++j) {
+                kokkosView(i, j) /= diagonalValue;
+            }
+        }
+    }
+
+    return kokkosView;
+}
+
+
+Kokkos::View<double**> getUniformMergeCostsLike(Kokkos::View<double**> T) { // Exponential mode simulates variability over orders of magnitude
+    // Create a Kokkos View with the same dimensions
+    int n = T.extent(0);
+    Kokkos::View<double**> kokkosView("kokkosView", n, n);
+    // Fill the Kokkos View with 0.5 values
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            kokkosView(i, j) = 0.5;
+        }
+    }
+    return kokkosView;
+}
+
+void print_matrix(const Kokkos::View<double**>& T) {
+    const int numRows = T.extent(0);
+    const int numCols = T.extent(1);
+
+    // Print the matrix
+    for (int i = 0; i < numRows; ++i) {
+        for (int j = 0; j < numCols; ++j) {
+            std::cout << T(i, j) << " "; // Accessing T(i, j)
+        }
+        std::cout << std::endl;
+    }
+}
+
+void print_map(const std::map<int, int>& myMap) {
+    std::cout << "Map contents:\n";
+    for (const auto& pair : myMap) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << '\n';
+    }
+}
+
+
+////////////////////////////////
+//////////// TESTS /////////////
+////////////////////////////////
+
+
+void run_test(std::vector<std::vector<double>> T_vec_of_vec, double costTarget = 0, std::string test_name = "default_name"){
+    auto T = vectorToKokkosView(T_vec_of_vec);
+    BucketOrderingSolver soln = BucketOrderingSolver(T,getUniformMergeCostsLike(T),costTarget,1);
+    soln.solve();
+    std::cout << "Ran test: " << test_name << std::endl;
+    std::cout << "Merge cost: " << soln.get_best().get_mergeCost() << std::endl;
+    print_map(soln.get_best().get_map());
+}
 
 int main(int argc, char* argv[]) {
+    // Load into kokkos
+    Kokkos::initialize();
+    std::cout << "Running test serries..." << std::endl;
+    std::vector<std::vector<double>> T_vec_of_vec;
+
+    //// T1 TESTING ////
+    T_vec_of_vec = {
+        {1000}
+    };
+    //run_test(T_vec_of_vec,100);
+
+    ///// T2 TESTING ///
+    T_vec_of_vec = {
+        {1000,0.2},
+        {2.,1001}
+    };
+    //run_test(T_vec_of_vec,100);
+    //run_test(T_vec_of_vec,0.5);
+    run_test(T_vec_of_vec,0.01);
+
+    ///// T4 TESTING ///
+    T_vec_of_vec = {
+        {2, 10.1, 1, 10.2},
+        {1, 2, 1, 10.3},
+        {10.4, 10.5, 2, 10.6},
+        {1, 1, 1, 2}
+    };
+    
+
+
+
+
+
     return 0;
 }
+
+
+
+    /*
+
+        // Expected result is 1 2 0 3
+    //partialOrder expectedOrder(4,6,4);
+    //std::vector<std::optional<int>> solnBlocks = {1,2,0,3};
+        std::map<int, int> solnMap = {
+        {0, 1},   // Eq 0 maps to block 1
+        {1, 2},
+        {2, 0},
+        {3, 3}
+    };
+    double solnLoss=6;
+    //expectedOrder.blocks=solnBlocks;
+
+
+    // EXHAUSTIVE SOLN
+    BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
+    exhaustiveObj.solveExhuastive();
+    exhaustiveObj.minLossOrder.print();
+    std::map<int,int> exhuastiveMap=exhaustiveObj.minLossOrder.getMap();
+    EXPECT_EQ(exhuastiveMap,solnMap);
+
+    // BB WITH NO BRANCH CUTTING NO MERGING
+    BranchAndBoundPermutationSearch bbObj = BranchAndBoundPermutationSearch(T);
+    bbObj.solve();
+    exhaustiveObj.minLossOrder.print();
+    std::map<int,int> bbMap=exhaustiveObj.minLossOrder.getMap();
+    EXPECT_EQ(bbMap,solnMap);
+    EXPECT_NEAR(exhaustiveObj.minLossOrder.loss,bbObj.minLossOrder.loss,1E-8);
+    // Check total scanned
+    EXPECT_EQ(bbObj.n,4);
+    EXPECT_EQ(bbObj.numLeafNodes,24);
+
+    // BB WITH BRANCH CUTTING
+    BranchAndBoundPermutationSearch bbObj_cutting = BranchAndBoundPermutationSearch(T);
+    bbObj_cutting.allowBranchCutting=true;
+    bbObj_cutting.solve();
+    bbObj_cutting.minLossOrder.print();
+    std::map<int,int> bbMap_cutting=exhaustiveObj.minLossOrder.getMap();
+    EXPECT_EQ(bbMap_cutting,solnMap);
+    EXPECT_NEAR(exhaustiveObj.minLossOrder.loss,bbObj_cutting.minLossOrder.loss,1E-8);
+    // Check total scanned, should have gone down
+    EXPECT_EQ(bbObj_cutting.n,4);
+    EXPECT_LE(bbObj_cutting.numLeafNodes, 23);
+
+    // Test in loop with random T
+    std::cout << "Testing T random test: " << std::endl;
+    T = getRandomT(6);
+    print_matrix(T);
+    EXPECT_EQ(T(3,3), 1.);
+    EXPECT_GE(T(3,3), T(3,0)); // Diag largest
+    EXPECT_GE(T(3,3), T(3,1)); // Diag largest
+    EXPECT_GE(T(3,3), T(3,2)); // Diag largest
+
+    // Test a bunch of T to make sure exhaustive and branch cutting give the same result
+    for (int i=0; i<100; i++){
+        T = getRandomT(7);
+        BranchAndBoundPermutationSearch exhaustiveObj = BranchAndBoundPermutationSearch(T);
+        exhaustiveObj.solveExhuastive();
+        exhaustiveObj.minLossOrder.print();
+        std::map<int,int> exhuastiveMap=exhaustiveObj.minLossOrder.getMap();
+
+        BranchAndBoundPermutationSearch bbObj = BranchAndBoundPermutationSearch(T);
+        bbObj.allowBranchCutting=true;
+        bbObj.solve();
+        bbObj.minLossOrder.print();
+        std::map<int,int> bbMap=exhaustiveObj.minLossOrder.getMap();
+
+        EXPECT_EQ(exhuastiveMap,bbMap);
+        EXPECT_NEAR(exhaustiveObj.minLossOrder.loss,bbObj.minLossOrder.loss,1E-8);
+    }
+    
+    // Check with merging. Want to total to be as estimated from formula (see python).
+    // 3 -> 13   7 -> 47293
+    T = getRandomT(7);
+    BranchAndBoundPermutationSearch bbObj_merging = BranchAndBoundPermutationSearch(T);
+    bbObj_merging.allowBranchCutting=false;
+    bbObj_merging.allowMerge=true;
+    bbObj_merging.solve();
+    // Check total scanned
+    EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
+
+    easy_timer et1 = easy_timer();
+    int trials=10;
+    int n=13;
+    int total_nodes = 0;
+    for (int i=0; i<n; i++){
+
+        T = getRandomT(16,true);
+        easy_timer et2 = easy_timer();
+        BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
+        speedObj.allowBranchCutting=true;
+        speedObj.allowMerge=false;
+        speedObj.solve();
+
+        // Report results
+        std::cout << "Solved problem with:" << std::endl;
+        et2.print_time();
+        std::cout << "Leaves:" << std::endl;
+        std::cout << speedObj.numLeafNodes << std::endl;
+        std::cout << "Forks:" << std::endl;
+        std::cout << speedObj.numInternalNodes;
+        std::cout << std::endl;
+        total_nodes+=speedObj.numInternalNodes+speedObj.numLeafNodes;
+        et2.restart();
+        //print_matrix(T);
+
+        //speedObj.minLossOrder.print();
+    }
+    std::cout << std::endl << "Ave time for " << trials << " trials at "<< n <<"x"<< n <<": " << et1.time() /trials << std::endl;
+    std::cout << "Ave nodes : " << total_nodes/trials << std::endl;
+    EXPECT_LE(et1.time() , 10.); // Expect less than a second
+}
+
+*/

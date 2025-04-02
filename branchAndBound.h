@@ -64,9 +64,13 @@ public:
     const double costTarget;
     const int N;
     [[nodiscard]] auto get_best() const {return best;};
+    void solve();
+    int leaf_nodes=0;
+    int internal_nodes=0;
 
 private:
     BucketingOption best;
+    BucketingOption base;
     
 };
 

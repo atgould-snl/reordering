@@ -1,3 +1,4 @@
+#pragma once
 #ifndef BLACK_BOX_LOP_H
 #define BLACK_BOX_LOP_H
 

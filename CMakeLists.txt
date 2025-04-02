@@ -17,6 +17,6 @@ link_directories(${Trilinos_LIBRARY_DIRS})
 set(Sources
     branchAndBound.cpp
 )
-add_executable(${This} main.cpp ${Sources})
+add_executable(${This} main.cpp)
 # Link against Trilinos and Kokkos
 target_link_libraries(${This} ${Trilinos_LIBRARIES})

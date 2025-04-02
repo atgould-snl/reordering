@@ -3,7 +3,7 @@
 #include <vector>
 
 void STK_ThrowRequire(bool condition) {
-    if (condition) {
+    if (!condition) {
         throw std::runtime_error("Condition not met");
     }
 }
@@ -19,12 +19,13 @@ BucketingOption::BucketingOption(const BucketOrderingSolver* problem)
 }
 
 std::vector<BucketingOption> BucketingOption::makeChildren() const {
+  if (nStableBuckets == int(buckets.size())) {return std::vector<BucketingOption>();} // Empty child vector if all buckets are stable already
   // Make children by greedy merge selection
   // First find L*, the larges lower diagonal term associated with a non-stable bucket
   auto [a_star, L_star] = get_a_star_L_star();
   // Create a child where a_star is merged to each stable block, tracking the potential of each.
   std::vector<BucketingOption> children = std::vector<BucketingOption>(nStableBuckets+1, *this); // Make copies of self
-  for (unsigned long b; b < nStableBuckets; b++){
+  for (int b = 0; b < nStableBuckets; b++){
     children[b].merge(a_star,b); // Also runs LOP
   }
   // Create child where a_star gets its own bucket
@@ -54,7 +55,6 @@ void BucketingOption::newBucket(int a_star) {
 }
 
 bool BucketingOption::operator<(const BucketingOption& other) const { // Sees if one is better than the other
-
   return optimisticMergeCostToHitTarget > other.get_optimisticMergeCostToHitTarget(); // > instead of < for priority queue
 }
 
@@ -80,22 +80,27 @@ double BucketingOption::bucketSum(const int a, const int b, const bool mergeCost
 
 std::pair<int, double> BucketingOption::get_a_star_L_star() const {
   double L_star = std::numeric_limits<double>::max();
-  int a_star = 0;
-  for (unsigned long a = nStableBuckets; a < buckets.size(); a++) { // Loop through non-stable only
-      for (unsigned long b = 0; b < buckets.size(); b++) {
-          if (order[a] <= order[b]) { continue; } // Filter out nonLD blocks
-          double L = bucketSum(a, b);
-          if (L < L_star) { L_star = L; a_star = a; }
+  int a_star = -1;
+  for (int a = 0; a < int(buckets.size()); a++) { // Loop through non-stable only
+      for (int b = 0; b < int(buckets.size()); b++) {
+        if ((a <= nStableBuckets -1) && (b <= nStableBuckets -1)){ continue;} // Stable zone, do not search here
+        if (order[a] <= order[b]) { continue; } // Filter out nonLD blocks
+        double L = bucketSum(a, b);
+        if (L < L_star) { 
+          L_star = L; 
+          a_star = a>b ? a : b; // Call a_star the greater of a and b
+        } 
       }
   }
+  STK_ThrowRequire(a_star!=-1);
   return std::pair<int, double>(a_star, L_star);
 }
 
 void BucketingOption::updateOrder() {
   BlockNormsViewType tournament("normalForm", buckets.size(), buckets.size());
   // Tournament based on the buckets
-  for (unsigned long a=0; a < buckets.size(); a++){
-    for (unsigned long b=0; b < buckets.size(); b++){
+  for (int a=0; a < int(buckets.size()); a++){
+    for (int b=0; b < int(buckets.size()); b++){
       if (a>b) { continue;} // Block is below diag, filter out
       if (a==b) { 
         tournament(a,a)=0;
@@ -115,13 +120,13 @@ void BucketingOption::updateOrder() {
   LinearOrderingSolver solver{tournament, problem->tMaxWalltime}; // Is communicator pulled in from the namespace??
   solver.solve();
   order_of_rows = solver.order();
-  std::vector<int> order(order_of_rows.size());
-  std::iota( order_of_rows.begin(), order_of_rows.end(), 0);
+  order = std::vector<int>(order_of_rows.size());
+  std::iota( order.begin(), order.end(), 0);
   std::sort(order.begin(), order.end(), [this](int a, int b) { return order_of_rows[a] < order_of_rows[b];});
 }
 
 void BucketingOption::updateMap() {
-  for (unsigned long bucket_rank=0; bucket_rank<buckets.size(); bucket_rank++){
+  for (int bucket_rank=0; bucket_rank<int(buckets.size()); bucket_rank++){
     auto bucket = buckets[order[bucket_rank]];
     for (const auto& physics_block : bucket) {
       physics_to_block_map[physics_block] = int(bucket_rank);
@@ -131,8 +136,8 @@ void BucketingOption::updateMap() {
 
 void BucketingOption::updateCost(){ // Find the score based on the order
   cost=0;
-  for (unsigned long a=0; a < buckets.size(); a++){
-    for (unsigned long b=0; b < buckets.size(); b++){
+  for (int a=0; a < int(buckets.size()); a++){
+    for (int b=0; b < int(buckets.size()); b++){
       cost += order[a]>order[b] ? bucketSum(a,b) : 0;
     }
   }
@@ -140,7 +145,7 @@ void BucketingOption::updateCost(){ // Find the score based on the order
 
 void BucketingOption::updateMergeCost(){ // Find the score based on the order
   mergeCost=0;
-  for (unsigned long a=0; a < buckets.size(); a++){
+  for (int a=0; a < int(buckets.size()); a++){
     for (const auto& i : buckets[a]) {
       for (const auto& j : buckets[a]) {
         if (i!=j){
@@ -162,13 +167,14 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
   };
   std::vector<L_option_struct> L_options;
   // Loop through the buckets and fill out L options
-  for (unsigned long a = nStableBuckets; a < buckets.size(); a++) { // Loop through non-stable only
-    for (unsigned long b = 0; b < buckets.size(); b++) {
-        if (order[a] <= order[b]) { continue; } // Filter out nonLD blocks
-        
-        double L_cost = bucketSum(a, b);
-        double L_mergeCost = bucketSum(a,b,L_mergeCost=true);
-        L_options.push_back(L_option_struct(L_cost,L_mergeCost));
+  for (int a = 0; a < int(buckets.size()); a++) { // Loop through non-stable only
+    for (int b = 0; b < int(buckets.size()); b++) {
+      if (a <= nStableBuckets -1 && b <= nStableBuckets -1){ continue;} // Stable zone, do not search here
+      if (order[a] <= order[b]) { continue; } // Filter out nonLD blocks
+      
+      double L_cost = bucketSum(a, b);
+      double L_mergeCost = bucketSum(a,b,L_mergeCost=true);
+      L_options.push_back(L_option_struct(L_cost,L_mergeCost));
     }
   }
   // Sort by ratio
@@ -179,7 +185,7 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
     // Will adding the new cost take us under the target?
     if (optimisticCost-L_options[i].cost < problem->costTarget){
       // Subtract fraction and return
-      double fraction = L_options[i].cost / (optimisticCost - problem->costTarget);
+      double fraction =  (optimisticCost - problem->costTarget) / L_options[i].cost;
       STK_ThrowRequire(fraction<1.); STK_ThrowRequire(fraction>0.);
       optimisticMergeCostToHitTarget += fraction * L_options[i].mergeCost;
       return;
@@ -193,27 +199,35 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
 }
 
 BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime)
-    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this)) {
+    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this)), base(BucketingOption(this)) {
     BucketingOption base = BucketingOption(this); // Pass this to BucketingOption
-    std::priority_queue<BucketingOption> optionsQueue;
+}
 
-    // Add options to the queue
-    optionsQueue.push(base);
+void BucketOrderingSolver::solve(){
+  std::priority_queue<BucketingOption> optionsQueue;
 
-    // Process the option with the greatest criteria
-    while (!optionsQueue.empty()) {
-        BucketingOption topOption = optionsQueue.top(); // Get the option with the greatest criteria
-        optionsQueue.pop(); // Remove it from the queue
+  // Add options to the queue
+  optionsQueue.push(base);
 
-        // If the target is reached, see if this one is better than the current best
-        if (topOption.get_cost() < costTarget){
-          if (best < topOption || best.get_cost() > costTarget){
-            best = topOption;
-          }
+  // Process the option with the greatest criteria
+  while (!optionsQueue.empty()) {
+      BucketingOption topOption = optionsQueue.top(); // Get the option with the greatest criteria
+      optionsQueue.pop(); // Remove it from the queue
+
+      // If the target is reached, see if this one is better than the current best
+      if (topOption.get_cost() < costTarget){
+        if (best < topOption || best.get_cost() > costTarget){
+          best = topOption;
         }
+      }
+      else{
         // Otherwise make children from the top option and add them to queue
-        for (const auto & child : topOption.makeChildren()){
+        auto children = topOption.makeChildren();
+        for (const auto & child : children){
+          if (child.get_nStableBuckets() == child.get_map().size()){ leaf_nodes++;}
+          else {internal_nodes ++;}
           optionsQueue.push(child);
         }
-    }
+      }
+  }
 }
