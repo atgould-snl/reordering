@@ -1,4 +1,5 @@
 #include "branchAndBound.h"
+#include "common.h"
 #include <limits>
 #include <vector>
 
@@ -117,8 +118,10 @@ void BucketingOption::updateOrder() {
     }
   }
   // Call the LOP solver
+  global_timer_LOP.start();
   LinearOrderingSolver solver{tournament, problem->tMaxWalltime}; // Is communicator pulled in from the namespace??
   solver.solve();
+  global_timer_LOP.pause();
   order_of_rows = solver.order();
   order = std::vector<int>(order_of_rows.size());
   std::iota( order.begin(), order.end(), 0);
@@ -216,20 +219,22 @@ void BucketOrderingSolver::solve(){
       optionsQueue.pop(); // Remove it from the queue
 
       // If the target is reached, see if this one is better than the current best
-      if (topOption.get_cost() < costTarget){
+      if (topOption.get_cost() <= costTarget){
         if (best < topOption || best.get_cost() > costTarget){
           best = topOption;
         }
         if (!exhaustive_mode){ continue; } // No need to make children, target cost is already found
       }
       // Is this even worth running? Is the best below target and the best is better than the top option? We can call the whole search done
-      if (best.get_cost() > costTarget && topOption < best && !exhaustive_mode) { return; }
+      if ((best.get_cost() < costTarget) && (topOption < best) && (!exhaustive_mode)) { 
+        return; 
+      }
 
       // Otherwise make children from the top option and add them to queue
       auto children = topOption.makeChildren();
       for (const auto & child : children){
         if (child.is_leaf()){ leaf_nodes++;}
-        else {internal_nodes ++;}
+        else {internal_nodes++;}
         optionsQueue.push(child);
       }
   }

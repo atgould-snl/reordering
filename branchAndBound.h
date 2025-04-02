@@ -73,8 +73,6 @@ private:
     BucketingOption best;
     BucketingOption base;
     bool exhaustive_mode;
-    
-    
 };
 
 #endif // BUCKET_SOLVER_H

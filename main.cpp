@@ -1,6 +1,7 @@
 #include "branchAndBound.h"
 #include "branchAndBound.cpp" // TODO: THIS SHOULD NOT BE INCLUDED HERE! SHOULD GO IN THE CMAKE
 #include <iostream>
+#include <ostream>
 #include <string>
 #include <vector>
 #include "Kokkos_Core.hpp"
@@ -31,7 +32,8 @@ Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3
 
     // Seed the random number generator
     std::random_device rd;  // Obtain a random number from hardware
-    std::mt19937 gen(rd());  // Seed the generator
+    //std::mt19937 gen(5);  // Seed the generator // rd();
+    std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, randMax);  // Define the range
 
     // Fill the Kokkos View with random values
@@ -119,9 +121,10 @@ void print_map(const std::map<int, int>& myMap) {
 
 
 std::map<int,int> run_test(Kokkos::View<double**> T, double costTarget = 0, bool exhuastive = false, std::string test_name = "default_name"){
-    BucketOrderingSolver soln = BucketOrderingSolver(T,getUniformMergeCostsLike(T),costTarget,1);
+    BucketOrderingSolver soln = BucketOrderingSolver(T,getUniformMergeCostsLike(T),costTarget,1,exhuastive);
     soln.solve();
     std::cout << "Ran test: " << test_name << std::endl;
+    std::cout << "Cost: " << soln.get_best().get_cost() << std::endl;
     std::cout << "Merge cost: " << soln.get_best().get_mergeCost() << std::endl;
     std::cout << "Leaf nodes : " << soln.leaf_nodes << std::endl;
     std::cout << "Inner nodes: " << soln.internal_nodes << std::endl;
@@ -165,8 +168,19 @@ int main(int argc, char* argv[]) {
         {1, 1, 1, 2}
     };
     // run_test(T_vec_of_vec,1000,true);
-    run_test(T_vec_of_vec,1000,false);
+    //run_test(T_vec_of_vec,1000,false);
 
+    auto T = getRandomT(8);
+    print_matrix(T);
+    global_timer_all.start();
+
+    run_test(T, 0.3,false);
+    std::cout << "LOP Time: " << global_timer_LOP.time() << std::endl;
+    std::cout << "Total Time: " << global_timer_all.time() << std::endl;
+
+
+
+    //run_test(T, 0.1,true);
     return 0;
 }
 

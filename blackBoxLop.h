@@ -232,7 +232,7 @@ public:
   void solve()
   {
     tStart = 0;
-    timer.restart();
+    timer.reset();
     branch_and_bound(0, 0);
     int reason = static_cast<int>(terminationReason);
     terminationReason = static_cast<TerminationReason>(reason);
