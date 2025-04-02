@@ -182,8 +182,8 @@ TEST(branchAndBoundTests, all){
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
     easy_timer et1 = easy_timer();
-    for (int i=0; i<10; i++){
-        T = getRandomT(15,true);
+    for (int i=0; i<100; i++){
+        T = getRandomT(12,true);
         easy_timer et2 = easy_timer();
         BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
         speedObj.allowBranchCutting=true;
@@ -201,7 +201,7 @@ TEST(branchAndBoundTests, all){
 
         //speedObj.minLossOrder.print();
     }
-    std::cout << "Time for 10 trials at 15x15: " << std::endl;
+    std::cout << "Time for 100 trials at 15x15: " << std::endl;
     EXPECT_LE(et1.time() , 10.); // Expect less than a second
     et1.print_time();
 }
