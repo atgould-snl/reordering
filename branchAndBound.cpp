@@ -198,8 +198,8 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
   optimisticMergeCostToHitTarget = std::numeric_limits<double>::max()/2;
 }
 
-BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime)
-    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this)), base(BucketingOption(this)) {
+BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime, bool exhaustive_mode)
+    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this)), base(BucketingOption(this)), exhaustive_mode(exhaustive_mode) {
     BucketingOption base = BucketingOption(this); // Pass this to BucketingOption
 }
 
@@ -212,6 +212,7 @@ void BucketOrderingSolver::solve(){
   // Process the option with the greatest criteria
   while (!optionsQueue.empty()) {
       BucketingOption topOption = optionsQueue.top(); // Get the option with the greatest criteria
+      bool better = topOption < base;
       optionsQueue.pop(); // Remove it from the queue
 
       // If the target is reached, see if this one is better than the current best
@@ -219,15 +220,17 @@ void BucketOrderingSolver::solve(){
         if (best < topOption || best.get_cost() > costTarget){
           best = topOption;
         }
+        if (!exhaustive_mode){ continue; } // No need to make children, target cost is already found
       }
-      else{
-        // Otherwise make children from the top option and add them to queue
-        auto children = topOption.makeChildren();
-        for (const auto & child : children){
-          if (child.get_nStableBuckets() == child.get_map().size()){ leaf_nodes++;}
-          else {internal_nodes ++;}
-          optionsQueue.push(child);
-        }
+      // Is this even worth running? Is the best below target and the best is better than the top option? We can call the whole search done
+      if (best.get_cost() > costTarget && topOption < best && !exhaustive_mode) { return; }
+
+      // Otherwise make children from the top option and add them to queue
+      auto children = topOption.makeChildren();
+      for (const auto & child : children){
+        if (child.is_leaf()){ leaf_nodes++;}
+        else {internal_nodes ++;}
+        optionsQueue.push(child);
       }
   }
 }

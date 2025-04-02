@@ -116,13 +116,24 @@ void print_map(const std::map<int, int>& myMap) {
 ////////////////////////////////
 
 
-void run_test(std::vector<std::vector<double>> T_vec_of_vec, double costTarget = 0, std::string test_name = "default_name"){
-    auto T = vectorToKokkosView(T_vec_of_vec);
+
+
+std::map<int,int> run_test(Kokkos::View<double**> T, double costTarget = 0, bool exhuastive = false, std::string test_name = "default_name"){
     BucketOrderingSolver soln = BucketOrderingSolver(T,getUniformMergeCostsLike(T),costTarget,1);
     soln.solve();
     std::cout << "Ran test: " << test_name << std::endl;
     std::cout << "Merge cost: " << soln.get_best().get_mergeCost() << std::endl;
-    print_map(soln.get_best().get_map());
+    std::cout << "Leaf nodes : " << soln.leaf_nodes << std::endl;
+    std::cout << "Inner nodes: " << soln.internal_nodes << std::endl;
+    auto map = soln.get_best().get_map();
+    print_map(map);
+    std::cout << std::endl;
+    return map;
+}
+
+std::map<int,int> run_test(std::vector<std::vector<double>> T_vec_of_vec, double costTarget = 0, bool exhuastive = false, std::string test_name = "default_name"){
+    auto T = vectorToKokkosView(T_vec_of_vec);
+    return run_test(T, costTarget, exhuastive, test_name);
 }
 
 int main(int argc, char* argv[]) {
@@ -144,7 +155,7 @@ int main(int argc, char* argv[]) {
     };
     //run_test(T_vec_of_vec,100);
     //run_test(T_vec_of_vec,0.5);
-    run_test(T_vec_of_vec,0.01);
+    //run_test(T_vec_of_vec,0.01,true);
 
     ///// T4 TESTING ///
     T_vec_of_vec = {
@@ -153,11 +164,8 @@ int main(int argc, char* argv[]) {
         {10.4, 10.5, 2, 10.6},
         {1, 1, 1, 2}
     };
-    
-
-
-
-
+    // run_test(T_vec_of_vec,1000,true);
+    run_test(T_vec_of_vec,1000,false);
 
     return 0;
 }

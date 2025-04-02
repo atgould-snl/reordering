@@ -26,6 +26,7 @@ public:
     [[nodiscard]] auto get_nStableBuckets() const {return nStableBuckets;};
     [[nodiscard]] auto get_map() const {return physics_to_block_map;};
     [[nodiscard]] auto get_optimisticMergeCostToHitTarget() const {return optimisticMergeCostToHitTarget;};
+    bool is_leaf() const {return nStableBuckets==int(buckets.size());}
 
     std::vector<BucketingOption> makeChildren() const;
     void merge(int a_star, int b);
@@ -57,7 +58,7 @@ private:
 
 class BucketOrderingSolver {
 public:
-    BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime);
+    BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime, bool exhaustive_mode=false);
     const BlockNormsViewType blockNorms;
     const BlockNormsViewType blockMergeCosts;
     const double tMaxWalltime;
@@ -66,11 +67,13 @@ public:
     [[nodiscard]] auto get_best() const {return best;};
     void solve();
     int leaf_nodes=0;
-    int internal_nodes=0;
+    int internal_nodes=1;
 
 private:
     BucketingOption best;
     BucketingOption base;
+    bool exhaustive_mode;
+    
     
 };
 
