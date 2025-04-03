@@ -170,18 +170,28 @@ int main(int argc, char* argv[]) {
     // run_test(T_vec_of_vec,1000,true);
     //run_test(T_vec_of_vec,1000,false);
 
-    auto T = getRandomT(15);
+    auto T = getRandomT(12);
     print_matrix(T);
     global_timer_all.start();
 
-    run_test(T, 0.3,false);
+    //run_test(T, 0.3,false);
     std::cout << "LOP Time: " << global_timer_LOP.time() << std::endl;
     std::cout << "LOP Calls: " << global_LOP_call_counter << std::endl;
     std::cout << "Total Time: " << global_timer_all.time() << std::endl;
-
-
-
     //run_test(T, 0.1,true);
+
+
+    int n_trials = 100;
+    int n = 6;
+    for (int i=0; i<n; i++){
+        auto T = getRandomT(n);
+        auto m1 = run_test(T,0.01,false);
+        auto m1_ex = run_test(T,0.01,true);
+        STK_ThrowRequire(m1==m1_ex);
+        auto m2 = run_test(T,0.1,false);
+        auto m2_ex = run_test(T,0.1,true);
+        STK_ThrowRequire(m2==m2_ex);
+    }
     return 0;
 }
 

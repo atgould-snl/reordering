@@ -226,7 +226,8 @@ void BucketOrderingSolver::solve(){
         }
         if (!exhaustive_mode){ continue; } // No need to make children, target cost is already found
       }
-      // Is this even worth running? Is the best below target and the best is better than the top option? We can call the whole search done
+
+      // Is this worth running? Is the best below target and the best is better than the top option? We can call the whole search done
       if ((best.get_cost() < costTarget) && (topOption < best) && (!exhaustive_mode)) { 
         return; 
       }
