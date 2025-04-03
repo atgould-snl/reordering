@@ -121,6 +121,7 @@ void BucketingOption::updateOrder() {
   global_timer_LOP.start();
   LinearOrderingSolver solver{tournament, problem->tMaxWalltime}; // Is communicator pulled in from the namespace??
   solver.solve();
+  global_LOP_call_counter++;
   global_timer_LOP.pause();
   order_of_rows = solver.order();
   order = std::vector<int>(order_of_rows.size());

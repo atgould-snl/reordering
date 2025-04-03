@@ -53,3 +53,4 @@ public:
 
 easy_timer global_timer_LOP;
 easy_timer global_timer_all;
+int global_LOP_call_counter;

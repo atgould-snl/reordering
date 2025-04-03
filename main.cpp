@@ -170,12 +170,13 @@ int main(int argc, char* argv[]) {
     // run_test(T_vec_of_vec,1000,true);
     //run_test(T_vec_of_vec,1000,false);
 
-    auto T = getRandomT(8);
+    auto T = getRandomT(15);
     print_matrix(T);
     global_timer_all.start();
 
     run_test(T, 0.3,false);
     std::cout << "LOP Time: " << global_timer_LOP.time() << std::endl;
+    std::cout << "LOP Calls: " << global_LOP_call_counter << std::endl;
     std::cout << "Total Time: " << global_timer_all.time() << std::endl;
 
 
