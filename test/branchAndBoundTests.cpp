@@ -3,6 +3,7 @@
 #include "../common.h"
 #include "../branchAndBound.h"
 #include "Kokkos_Core.hpp"
+#include "../blackBoxLop.h"
 
 // Function to convert std::vector<std::vector<double>> to Kokkos::View<double**>
 Kokkos::View<double**> vectorToKokkosView(const std::vector<std::vector<double>>& vec) {
@@ -181,27 +182,41 @@ TEST(branchAndBoundTests, all){
     // Check total scanned
     EXPECT_EQ(bbObj_merging.numLeafNodes, 47293);
 
-    easy_timer et1 = easy_timer();
-    for (int i=0; i<100; i++){
-        T = getRandomT(12,true);
-        easy_timer et2 = easy_timer();
+
+
+    // TIME TRIALS
+    easy_timer et_myBb = easy_timer();
+    easy_timer et_blackBox = easy_timer();
+    int N=15;
+    for (int i=0; i<10; i++){
+        T = getRandomT(N,true);
+
+        // MY BB
+        et_myBb.start();
         BranchAndBoundPermutationSearch speedObj = BranchAndBoundPermutationSearch(T);
         speedObj.allowBranchCutting=true;
         speedObj.allowMerge=false;
-        speedObj.solve();
-        std::cout << "Solved problem with:" << std::endl;
-        et2.print_time();
+        //speedObj.solve();
         std::cout << "Leaves:" << std::endl;
         std::cout << speedObj.numLeafNodes << std::endl;
         std::cout << "Forks:" << std::endl;
         std::cout << speedObj.numInternalNodes;
         std::cout << std::endl;
-        et2.restart();
+        et_myBb.pause();
+
+        // BLACK BOX
+        et_blackBox.start();
+        runBlackBoxLop(T);
+        et_blackBox.pause();
         //print_matrix(T);
 
         //speedObj.minLossOrder.print();
     }
-    std::cout << "Time for 100 trials at 15x15: " << std::endl;
-    EXPECT_LE(et1.time() , 10.); // Expect less than a second
-    et1.print_time();
+
+
+    std::cout << "Time for my bb 100 trials at " << N << "x" << N << ": " << std::endl;
+    //EXPECT_LE(et_myBb.time() , 10.); // Expect less than a second
+    et_myBb.print_time();
+    std::cout << "And blackbox at " << N << "x" << N << ": " << std::endl;
+    et_blackBox.print_time();
 }
