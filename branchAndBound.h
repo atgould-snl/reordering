@@ -18,12 +18,16 @@ class BucketOrderingSolver; // Forward declaration
 
 class BucketingOption {
 public:
-    BucketingOption(const BucketOrderingSolver* prob);
+    BucketingOption(const BucketOrderingSolver* prob, bool mergeAll=false);
+
+    // Friends
+    friend class BucketOrderingSolver;
 
     // Getters
     [[nodiscard]] auto get_cost() const {return cost;};
     [[nodiscard]] auto get_mergeCost() const {return mergeCost;};
     [[nodiscard]] auto get_nStableBuckets() const {return nStableBuckets;};
+    [[nodiscard]] auto get_nMerge() const {return nMerge;};
     [[nodiscard]] auto get_map() const {return physics_to_block_map;};
     [[nodiscard]] auto get_optimisticMergeCostToHitTarget() const {return optimisticMergeCostToHitTarget;};
     bool is_leaf() const {return nStableBuckets==int(buckets.size());}
@@ -38,6 +42,7 @@ public:
 private:
     std::vector<std::set<int>> buckets;
     int nStableBuckets;
+    int nMerge=0;
     std::map<int, int> physics_to_block_map;
     std::vector<int> order_of_rows;
     std::vector<int> order;
@@ -59,17 +64,26 @@ private:
 class BucketOrderingSolver {
 public:
     BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime, bool exhaustive_mode=false);
+
+    // Friends
+    friend class BucketingOption;
+
+    [[nodiscard]] auto get_best() const {return best;};
+    [[nodiscard]] auto get_leafNodes() const {return leaf_nodes;};
+    [[nodiscard]] auto get_internalNodes() const {return internal_nodes;};
+    
+    void solve();
+
+private:
     const BlockNormsViewType blockNorms;
     const BlockNormsViewType blockMergeCosts;
     const double tMaxWalltime;
     const double costTarget;
     const int N;
-    [[nodiscard]] auto get_best() const {return best;};
-    void solve();
+
     int leaf_nodes=0;
     int internal_nodes=1;
 
-private:
     BucketingOption best;
     BucketingOption base;
     bool exhaustive_mode;

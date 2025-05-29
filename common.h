@@ -54,3 +54,5 @@ public:
 easy_timer global_timer_LOP;
 easy_timer global_timer_all;
 int global_LOP_call_counter;
+std::vector<std::vector<double>> global_best_cost_record = std::vector<std::vector<double>>(1,std::vector<double>());
+std::vector<double> global_best_cost_record_time;

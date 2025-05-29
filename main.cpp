@@ -26,7 +26,7 @@ Kokkos::View<double**> vectorToKokkosView(const std::vector<std::vector<double>>
     return kokkosView;
 }
 
-Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3.) { // Exponential mode simulates variability over orders of magnitude
+Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3., double sparsity = 0.5) { // Exponential mode simulates variability over orders of magnitude
     // Create a Kokkos View with the same dimensions
     Kokkos::View<double**> kokkosView("kokkosView", n, n);
 
@@ -35,6 +35,7 @@ Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3
     //std::mt19937 gen(5);  // Seed the generator // rd();
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, randMax);  // Define the range
+    std::uniform_real_distribution<> dis_sparse(0.0, 1.0);  // Define the range
 
     // Fill the Kokkos View with random values
     for (size_t i = 0; i < n; ++i) {
@@ -42,7 +43,12 @@ Kokkos::View<double**> getRandomT(int n, bool expMode = true, double randMax = 3
             // Generate a random exponent between 1 and maxExp
             double rand=dis(gen);
             // Generate a random number in the range [10^1, 10^maxExp]
-            kokkosView(i, j) = expMode ? std::pow(10, rand) : rand;
+            if (dis_sparse(gen) > sparsity){
+                kokkosView(i, j) = expMode ? std::pow(10, rand) : rand;
+            }
+            else{
+                kokkosView(i, j) = 0.0;
+            }
         }
     }
 
@@ -112,12 +118,50 @@ void print_map(const std::map<int, int>& myMap) {
     }
 }
 
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+void writeVectorToCSV(const std::vector<std::vector<double>>& data, const std::string& filename = "cost_over_its.csv") {
+    // Open a file in write mode
+    std::ofstream file(filename);
+
+    // Check if the file is open
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    // Find the maximum length of the inner vectors
+    size_t max_length = 0;
+    for (const auto& vec : data) {
+        if (vec.size() > max_length) {
+            max_length = vec.size();
+        }
+    }
+
+    // Write the data to the CSV file
+    for (size_t i = 0; i < max_length; ++i) {
+        for (size_t j = 0; j < data.size(); ++j) {
+            if (i < data[j].size()) {
+                file << data[j][i]; // Write the element
+            }
+            // Add a comma if it's not the last column
+            if (j < data.size() - 1) {
+                file << ",";
+            }
+        }
+        file << "\n"; // New line after each row
+    }
+
+    // Close the file
+    file.close();
+    std::cout << "Data written to " << filename << " successfully." << std::endl;
+}
 
 ////////////////////////////////
 //////////// TESTS /////////////
 ////////////////////////////////
-
-
 
 
 std::map<int,int> run_test(Kokkos::View<double**> T, double costTarget = 0, bool exhuastive = false, std::string test_name = "default_name"){
@@ -126,8 +170,8 @@ std::map<int,int> run_test(Kokkos::View<double**> T, double costTarget = 0, bool
     std::cout << "Ran test: " << test_name << std::endl;
     std::cout << "Cost: " << soln.get_best().get_cost() << std::endl;
     std::cout << "Merge cost: " << soln.get_best().get_mergeCost() << std::endl;
-    std::cout << "Leaf nodes : " << soln.leaf_nodes << std::endl;
-    std::cout << "Inner nodes: " << soln.internal_nodes << std::endl;
+    std::cout << "Leaf nodes : " << soln.get_leafNodes() << std::endl;
+    std::cout << "Inner nodes: " << soln.get_internalNodes() << std::endl;
     auto map = soln.get_best().get_map();
     print_map(map);
     std::cout << std::endl;
@@ -152,13 +196,32 @@ int main(int argc, char* argv[]) {
     //run_test(T_vec_of_vec,100);
 
     ///// T2 TESTING ///
+
+
     T_vec_of_vec = {
-        {1000,0.2},
-        {2.,1001}
+        {0.329500, 0.020269, 0.022056, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.019202, 0.409623, 0.028737, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.019759, 0.025354, 0.444298, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.140499, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.140499, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.140499, 0.000000, 0.000000, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.140499, 0.000000, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.476457, 0.000000, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.280999, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.371727},
+    };
+
+    T_vec_of_vec = {
+        {0.329500, 0.020269, 0.000000, 0.000000},
+        {0.019202, 0.409623, 0.000000 ,0.000000},
+        {0.000000, 0.000000, 0.444298, 0.000000},
+        {0.000000, 0.000000, 0.000000, 0.140499}
     };
     //run_test(T_vec_of_vec,100);
     //run_test(T_vec_of_vec,0.5);
-    //run_test(T_vec_of_vec,0.01,true);
+    run_test(T_vec_of_vec,0.0000,true, "2x2");
+
+    
 
     ///// T4 TESTING ///
     T_vec_of_vec = {
@@ -170,28 +233,44 @@ int main(int argc, char* argv[]) {
     // run_test(T_vec_of_vec,1000,true);
     //run_test(T_vec_of_vec,1000,false);
 
-    auto T = getRandomT(12);
-    print_matrix(T);
-    global_timer_all.start();
 
-    //run_test(T, 0.3,false);
+    //// CORRECTNESS CHECK ////
+    int n_trials = 10;
+    int n = 6;
+    for (int i=0; i<n_trials; i++){
+        auto T = getRandomT(n);
+        auto m1 = run_test(T,0.01,false,"BB to 0.01");
+        auto m1_ex = run_test(T,0.01,true,"Exhuastive to 0.01");
+        STK_ThrowRequire(m1==m1_ex);
+        auto m2 = run_test(T,0.1,false, "BB to 0.1");
+        auto m2_ex = run_test(T,0.1,true,"Exhuastive to 0.1");
+        STK_ThrowRequire(m2==m2_ex);
+    }
+
+    return 0;
+
+    auto T = getRandomT(8);
+    print_matrix(T);
+    global_timer_all.reset();
+    global_timer_LOP.reset();
+    global_LOP_call_counter=0;
+
+    run_test(T, 0.3,false, "Big mat test");
     std::cout << "LOP Time: " << global_timer_LOP.time() << std::endl;
     std::cout << "LOP Calls: " << global_LOP_call_counter << std::endl;
     std::cout << "Total Time: " << global_timer_all.time() << std::endl;
     //run_test(T, 0.1,true);
 
+    //// CONVERGNCE TEST ////
 
-    int n_trials = 100;
-    int n = 6;
-    for (int i=0; i<n; i++){
+    n_trials = 10;
+    n = 8;
+    for (int i=0; i<n_trials; i++){
+        global_best_cost_record.push_back(std::vector<double>());
         auto T = getRandomT(n);
-        auto m1 = run_test(T,0.01,false);
-        auto m1_ex = run_test(T,0.01,true);
-        STK_ThrowRequire(m1==m1_ex);
-        auto m2 = run_test(T,0.1,false);
-        auto m2_ex = run_test(T,0.1,true);
-        STK_ThrowRequire(m2==m2_ex);
+        auto m = run_test(T,0.1,false);
     }
+    writeVectorToCSV(global_best_cost_record);
     return 0;
 }
 
