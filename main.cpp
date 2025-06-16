@@ -474,7 +474,9 @@ int main(int argc, char* argv[]) {
     };
 
     //run_test(T_vec_of_vec,100);
-    //run_test(T_vec_of_vec,0.5);
+    run_test(T_vec_of_vec,0.5);
+
+    return 0;
 
     // Find map
     auto map=run_test(T_vec_of_vec,0.1*0.1,false, "2x2");

@@ -191,7 +191,7 @@ void BucketingOption::updateOrder() {
   std::iota( order.begin(), order.end(), 0);
   std::sort(order.begin(), order.end(), [this](int a, int b) { return order_of_rows[a] < order_of_rows[b];});
 
-
+  /*
   /////// DEBUG LOP ONLY ///////
   updateCost();
   updateMap();
@@ -212,18 +212,8 @@ void BucketingOption::updateOrder() {
     print_matrix_2(reformed_blockNorms);
 
   }
+  */
 }
-
-/*
-void BucketingOption::updateMap_old() {
-  for (int bucket_rank=0; bucket_rank<int(buckets.size()); bucket_rank++){
-    auto bucket = buckets[order[bucket_rank]];
-    for (const auto& physics_block : bucket) {
-      physics_to_block_map[physics_block] = int(bucket_rank);
-    }
-  }
-}
-*/
 
 void BucketingOption::updateMap() {
   for (int bucket_idx=0; bucket_idx<int(buckets.size()); bucket_idx++){ // Loop through the buckets
