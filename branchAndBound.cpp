@@ -1,11 +1,43 @@
 #include "branchAndBound.h"
 #include "common.h"
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <list>
 #include <queue>
 #include <vector>
+
+bool almost_equal(double a, double b, double tolerance = 1e-8) {
+    return std::fabs(a - b) <= tolerance;
+}
+
+void print_matrix_2(const Kokkos::View<double**>& T) {
+  const int numRows = T.extent(0);
+  const int numCols = T.extent(1);
+
+  std::cout << "\n";
+  std::cout << "T = {\n";
+  for (int i = 0; i < numRows; i++){
+  std::cout << "    {";
+  for (int j = 0; j < numCols; j++){ 
+      // Print each element, followed by a comma if it's not the last element
+      std::cout << std::fixed << std::setprecision(12) << T(i,j);
+      if (j < numCols - 1) {
+          std::cout << ", ";
+      }
+  }
+  std::cout << "},\n";
+  }
+  std::cout << "};\n";
+}
+
+void print_map_2(const std::map<int, int>& myMap) {
+    std::cout << "Map contents:\n";
+    for (const auto& pair : myMap) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << '\n';
+    }
+}
 
 void STK_ThrowRequire(bool condition) {
     if (!condition) {
@@ -63,11 +95,26 @@ void BucketingOption::newBucket(int a_star) {
   STK_ThrowRequire(a_star > nStableBuckets - 1);
   STK_ThrowRequire(a_star < int(buckets.size()));
   STK_ThrowRequire(1 == int(buckets[a_star].size()));
-  std::set<int> tempBucket = buckets[nStableBuckets];
-  buckets[nStableBuckets] = buckets[a_star];
-  buckets[a_star] = tempBucket; // Ok if a_star = nStableBuckets
+
+  runLOP();
+  std::vector<int> order_old = order;
+  double cost_old = cost;
+  // Manually update order of buckets since two of them switched indicies
+  std::swap(buckets[a_star], buckets[nStableBuckets]);
+  std::swap(order[a_star], order[nStableBuckets]);
+
   nStableBuckets++;
-  runLOP(); // TODO: Easy optimization, this could be taken away since the order is impacted in a trivial way
+  std::vector<int> order_copy = order;
+  updateCost();
+  double cost_copy = cost;
+  runLOP(); // TODO: Easy optimization, this could be taken away since the order is impacted in a
+            // trivial way
+  //for (size_t i = 0; i < order_copy.size(); ++i) {
+  //  STK_ThrowRequire(order_copy[i] == order[i]);
+  //  order_old[i];
+  //}
+  // STK_ThrowRequire(cost_copy == cost);
+  
 }
 
 bool BucketingOption::operator<(const BucketingOption& other) const { // Sees if one is better than the other
@@ -84,10 +131,10 @@ void BucketingOption::runLOP() {
 
 double BucketingOption::bucketSum(const int a, const int b, const bool mergeCosts) const {
   double T = 0.0; // Initialize T
-  STK_ThrowRequire(a!=b);
+  //STK_ThrowRequire(a!=b);
   for (const auto& i : buckets[a]) { 
       for (const auto& j : buckets[b]) {
-          STK_ThrowRequire(i!=j);
+          //STK_ThrowRequire(i!=j);
           // For merge costs, include the cooresponding bucket above the diag too
           T += mergeCosts ? problem->blockMergeCosts(i,j)+problem->blockMergeCosts(i,j) : std::pow(problem->blockNorms(i, j), 2);
       }
@@ -143,13 +190,45 @@ void BucketingOption::updateOrder() {
   order = std::vector<int>(order_of_rows.size());
   std::iota( order.begin(), order.end(), 0);
   std::sort(order.begin(), order.end(), [this](int a, int b) { return order_of_rows[a] < order_of_rows[b];});
+
+
+  /////// DEBUG LOP ONLY ///////
+  updateCost();
+  updateMap();
+  if (almost_equal(cost, 0.00956199)){
+    std::cout << "\nCost: " << cost << std::endl;
+    print_map_2(physics_to_block_map);
+    std::cout << "TOURNAMENT:\n";
+    print_matrix_2(tournament);
+
+    BlockNormsViewType reformed_blockNorms("reformed_blockNorms", buckets.size(), buckets.size());
+    // Tournament based on the buckets
+    for (int a=0; a < int(buckets.size()); a++){
+      for (int b=0; b < int(buckets.size()); b++){
+        reformed_blockNorms(a,b) = std::sqrt(bucketSum(a,b));
+      }
+    }
+    std::cout << "BLOCKNORMS:\n";
+    print_matrix_2(reformed_blockNorms);
+
+  }
 }
 
-void BucketingOption::updateMap() {
+/*
+void BucketingOption::updateMap_old() {
   for (int bucket_rank=0; bucket_rank<int(buckets.size()); bucket_rank++){
     auto bucket = buckets[order[bucket_rank]];
     for (const auto& physics_block : bucket) {
       physics_to_block_map[physics_block] = int(bucket_rank);
+    }
+  }
+}
+*/
+
+void BucketingOption::updateMap() {
+  for (int bucket_idx=0; bucket_idx<int(buckets.size()); bucket_idx++){ // Loop through the buckets
+    for (const auto& i : buckets[bucket_idx]) { // Loop through that bucket
+      physics_to_block_map[i] = int(order[bucket_idx]); // Order says where it should go
     }
   }
 }
@@ -289,4 +368,5 @@ void BucketOrderingSolver::solve(){
       }
     }
   }
+  best.runLOP();
 }

@@ -10,6 +10,7 @@
 #include <utility>
 #include <chrono> // easy timer
 #include <set>
+#include <iomanip>
 
 #include "Kokkos_Core.hpp"
 
