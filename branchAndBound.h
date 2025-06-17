@@ -18,7 +18,7 @@ class BucketOrderingSolver; // Forward declaration
 
 class BucketingOption {
 public:
-    BucketingOption(const BucketOrderingSolver* prob, bool mergeAll=false);
+    BucketingOption(const BucketOrderingSolver & prob, bool mergeAll=false);
 
     // Friends
     friend class BucketOrderingSolver;

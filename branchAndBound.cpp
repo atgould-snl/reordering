@@ -46,8 +46,8 @@ void STK_ThrowRequire(bool condition) {
 }
 
 // Constructor
-BucketingOption::BucketingOption(const BucketOrderingSolver* problem, bool mergeAll)
-    : problem(problem), nStableBuckets(0), cost(0), mergeCost(0) {
+BucketingOption::BucketingOption(const BucketOrderingSolver & problem_ref, bool mergeAll)
+    : problem(&problem_ref), nStableBuckets(0), cost(0), mergeCost(0) {
     if (mergeAll){
       // Merge all into one bucket
       buckets.emplace_back(std::set<int>());
@@ -308,8 +308,8 @@ void BucketingOption::updateOptimisticMergeCostToHitTarget(){ // Lower bound for
 /////// BucketOrderingSolver ////////
 
 BucketOrderingSolver::BucketOrderingSolver(const BlockNormsViewType & blockNorms, const BlockNormsViewType & blockMergeCosts, const double costTarget, const double tMaxWalltime, bool exhaustive_mode)
-    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(this,true)), base(BucketingOption(this, false)), exhaustive_mode(exhaustive_mode) {
-    BucketingOption base = BucketingOption(this); // Pass this to BucketingOption
+    : blockNorms(blockNorms), blockMergeCosts(blockMergeCosts), costTarget(costTarget), tMaxWalltime(tMaxWalltime), N(int(blockNorms.extent(0))), best(BucketingOption(*this,true)), base(BucketingOption(*this, false)), exhaustive_mode(exhaustive_mode) {
+    BucketingOption base = BucketingOption(*this); // Pass this to BucketingOption
 }
 
 void BucketOrderingSolver::solve(){
